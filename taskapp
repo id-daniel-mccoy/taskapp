@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
+
+if [[ ! -d "$ROOT/node_modules" ]]; then
+  echo "Taskapp is not installed yet."
+  echo "Run: $ROOT/install.sh"
+  exit 1
+fi
+
+LAUNCHER="$ROOT/node_modules/.bin/electron-vite"
+if [[ ! -x "$LAUNCHER" ]]; then
+  echo "electron-vite is missing. Re-run $ROOT/install.sh"
+  exit 1
+fi
+
+args=()
+for value in "$@"; do
+  if [[ -e "$value" ]]; then
+    args+=("$(cd "$(dirname "$value")" && pwd)/$(basename "$value")")
+  else
+    args+=("$value")
+  fi
+done
+
+exec "$LAUNCHER" dev -- "${args[@]}"

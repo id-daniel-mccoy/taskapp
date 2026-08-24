@@ -1,0 +1,35 @@
+{
+  "name": "taskapp",
+  "productName": "Taskapp",
+  "version": "0.1.0",
+  "private": true,
+  "productName": "Taskapp",
+  "description": "A refined notepad for text, JSON, and PDFs — the first piece of Taskapp.",
+  "author": "Taskapp",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "main": "./out/main/index.js",
+  "scripts": {
+    "start": "electron-vite dev",
+    "dev": "electron-vite dev"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
+    "monaco-editor": "^0.52.2",
+    "pdfjs-dist": "^4.10.38",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^34.2.0",
+    "electron-vite": "^3.0.0",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0"
+  }
+}
