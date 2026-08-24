@@ -8,6 +8,7 @@ import type {
 } from '@shared/types'
 import { inspectJson } from '../lib/json'
 import { runNoteEdit } from '../lib/edit'
+import { displayName, inferFileType } from '@shared/mime'
 
 export interface JsonViewerDoc {
   id: string
@@ -16,6 +17,7 @@ export interface JsonViewerDoc {
   name: string
   mime: string
   content: string
+  dirty: boolean
 }
 
 export interface PdfViewerDoc {
@@ -27,7 +29,51 @@ export interface PdfViewerDoc {
   pdfData: Uint8Array
 }
 
-export type ViewerDoc = JsonViewerDoc | PdfViewerDoc
+export interface ImageViewerDoc {
+  id: string
+  kind: 'image'
+  path: string
+  name: string
+  mime: string
+  label: string
+  data: Uint8Array
+}
+
+export interface TextFileViewerDoc {
+  id: string
+  kind: 'text-file'
+  path: string
+  name: string
+  mime: string
+  label: string
+  content: string
+  dirty: boolean
+}
+
+export type ViewerDoc = JsonViewerDoc | PdfViewerDoc | ImageViewerDoc | TextFileViewerDoc
+export type EditableViewerDoc = JsonViewerDoc | TextFileViewerDoc
+
+function isEditableViewer(doc: ViewerDoc | null): doc is EditableViewerDoc {
+  return Boolean(doc && (doc.kind === 'json' || doc.kind === 'text-file'))
+}
+
+function viewerAfterSave(id: string, filePath: string, content: string): EditableViewerDoc {
+  const type = inferFileType(filePath)
+  const name = displayName(filePath)
+  if (type.kind === 'json') {
+    return { id, kind: 'json', path: filePath, name, mime: type.mime, content, dirty: false }
+  }
+  return {
+    id,
+    kind: 'text-file',
+    path: filePath,
+    name,
+    mime: type.mime.startsWith('image/') || type.kind === 'pdf' ? 'text/plain' : type.mime,
+    label: type.kind === 'pdf' || type.kind === 'image' || type.kind === 'unsupported' ? 'Text' : type.label,
+    content,
+    dirty: false
+  }
+}
 
 interface Toast {
   id: string
@@ -146,6 +192,17 @@ export function useWorkspace() {
     }
   }, [notes, toast])
 
+  const writeFileViewer = useCallback(async (doc: EditableViewerDoc, filePath = doc.path) => {
+    const result = await window.taskapp.writeFile(filePath, doc.content)
+    if (!result.ok) {
+      toast(result.error || 'Could not save the file.', 'error')
+      return false
+    }
+    const next = viewerAfterSave(doc.id, filePath, doc.content)
+    setViewers((current) => current.map((item) => (item.id === doc.id ? next : item)))
+    return true
+  }, [toast])
+
   const flushAllDirty = useCallback(async () => {
     for (const note of notes) {
       if (note.draft) {
@@ -157,8 +214,13 @@ export function useWorkspace() {
       const saved = await flushNote(note.id, note.content)
       if (!saved) return false
     }
+    for (const doc of viewers) {
+      if (!isEditableViewer(doc) || !doc.dirty) continue
+      const saved = await writeFileViewer(doc)
+      if (!saved) return false
+    }
     return true
-  }, [flushNote, notes, persistDraft])
+  }, [flushNote, notes, persistDraft, viewers, writeFileViewer])
 
   const selectNote = useCallback((id: string) => {
     setActiveNoteId(id)
@@ -206,13 +268,42 @@ export function useWorkspace() {
   }, [activeNoteId, flushNote])
 
   const saveActive = useCallback(async () => {
+    if (isEditableViewer(activeViewer)) {
+      await writeFileViewer(activeViewer)
+      return
+    }
+    if (activeViewer) {
+      toast('This file is read only.')
+      return
+    }
     if (!activeNote) return
     if (activeNote.draft) {
       await persistDraft(activeNote.id)
       return
     }
     await flushNote(activeNote.id, activeNote.content)
-  }, [activeNote, flushNote, persistDraft])
+  }, [activeNote, activeViewer, flushNote, persistDraft, toast, writeFileViewer])
+
+  const saveActiveAs = useCallback(async () => {
+    if (!isEditableViewer(activeViewer)) {
+      toast('Save as is for opened text files.')
+      return
+    }
+    const dialog = await window.taskapp.saveDialog(activeViewer.path)
+    if (dialog.canceled || !dialog.path) return
+    await writeFileViewer(activeViewer, dialog.path)
+  }, [activeViewer, toast, writeFileViewer])
+
+  const updateViewerContent = useCallback((content: string) => {
+    if (!activeViewerId) return
+    setViewers((current) =>
+      current.map((doc) =>
+        doc.id === activeViewerId && isEditableViewer(doc) && doc.content !== content
+          ? { ...doc, content, dirty: true }
+          : doc
+      )
+    )
+  }, [activeViewerId])
 
   const renameNote = useCallback(async (id: string, title: string) => {
     const current = notes.find((note) => note.id === id)
@@ -321,13 +412,64 @@ export function useWorkspace() {
           setActiveNoteId(null)
           return current
         }
+        const check = inspectJson(result.content)
         const next: JsonViewerDoc = {
           id: uid(),
           kind: 'json',
           path: result.path,
           name: result.name,
           mime: result.mime,
-          content: result.content
+          content: check.formatted ?? result.content,
+          dirty: false
+        }
+        setActiveViewerId(next.id)
+        setActiveNoteId(null)
+        return [...current, next]
+      })
+      return
+    }
+
+    if (result.kind === 'text-file') {
+      setViewers((current) => {
+        const existing = current.find((doc) => doc.kind === 'text-file' && doc.path === result.path)
+        if (existing) {
+          setActiveViewerId(existing.id)
+          setActiveNoteId(null)
+          return current
+        }
+        const next: TextFileViewerDoc = {
+          id: uid(),
+          kind: 'text-file',
+          path: result.path,
+          name: result.name,
+          mime: result.mime,
+          label: result.label,
+          content: result.content,
+          dirty: false
+        }
+        setActiveViewerId(next.id)
+        setActiveNoteId(null)
+        return [...current, next]
+      })
+      return
+    }
+
+    if (result.kind === 'image') {
+      setViewers((current) => {
+        const existing = current.find((doc) => doc.kind === 'image' && doc.path === result.path)
+        if (existing) {
+          setActiveViewerId(existing.id)
+          setActiveNoteId(null)
+          return current
+        }
+        const next: ImageViewerDoc = {
+          id: uid(),
+          kind: 'image',
+          path: result.path,
+          name: result.name,
+          mime: result.mime,
+          label: result.label,
+          data: asBytes(result.data)
         }
         setActiveViewerId(next.id)
         setActiveNoteId(null)
@@ -370,17 +512,24 @@ export function useWorkspace() {
   }, [openPaths])
 
   const closeViewer = useCallback((id: string) => {
-    setViewers((current) => {
-      const next = current.filter((doc) => doc.id !== id)
-      if (activeViewerId === id) {
-        setActiveViewerId(next.at(-1)?.id ?? null)
-        if (!next.length) {
-          setActiveNoteId((currentNote) => currentNote ?? notes[0]?.id ?? null)
-        }
+    const doc = viewers.find((item) => item.id === id)
+    void (async () => {
+      if (isEditableViewer(doc) && doc.dirty) {
+        const saved = await writeFileViewer(doc)
+        if (!saved) return
       }
-      return next
-    })
-  }, [activeViewerId, notes])
+      setViewers((current) => {
+        const next = current.filter((item) => item.id !== id)
+        if (activeViewerId === id) {
+          setActiveViewerId(next.at(-1)?.id ?? null)
+          if (!next.length) {
+            setActiveNoteId((currentNote) => currentNote ?? notes[0]?.id ?? null)
+          }
+        }
+        return next
+      })
+    })()
+  }, [activeViewerId, notes, viewers, writeFileViewer])
 
   const requestWindowClose = useCallback(() => {
     void flushAllDirty().then((ok) => {
@@ -392,6 +541,7 @@ export function useWorkspace() {
     if (command === 'new') void newNote()
     if (command === 'open') void openFiles()
     if (command === 'save') void saveActive()
+    if (command === 'save-as') void saveActiveAs()
     if (command === 'close' && activeViewer) closeViewer(activeViewer.id)
     if (command === 'rename' && activeNote) setTitleFocusKey((value) => value + 1)
     if (command === 'duplicate' && activeNote) void duplicateNote(activeNote.id)
@@ -423,7 +573,7 @@ export function useWorkspace() {
     if (command === 'show-notes-folder') {
       void window.taskapp.showNotesFolder()
     }
-  }, [activeNote, activeViewer, changeFont, closeViewer, duplicateNote, newNote, openFiles, persistSettings, requestDelete, saveActive, settings, showNoteFile, theme])
+  }, [activeNote, activeViewer, changeFont, closeViewer, duplicateNote, newNote, openFiles, persistSettings, requestDelete, saveActive, saveActiveAs, settings, showNoteFile, theme])
 
   useEffect(() => {
     let cancelled = false
@@ -456,6 +606,9 @@ export function useWorkspace() {
     const offOpen = window.taskapp.onOpenPaths((paths) => {
       void openPaths(paths)
     })
+    void window.taskapp.takePendingOpens().then((paths) => {
+      if (paths.length) void openPaths(paths)
+    })
     const offClose = window.taskapp.onCloseRequested(requestWindowClose)
     return () => {
       offMenu()
@@ -466,7 +619,7 @@ export function useWorkspace() {
 
   useEffect(() => {
     const title = activeViewer
-      ? `${activeViewer.name} — Taskapp`
+      ? `${isEditableViewer(activeViewer) && activeViewer.dirty ? '• ' : ''}${activeViewer.name} — Taskapp`
       : activeNote
         ? `${activeNote.dirty ? '• ' : ''}${activeNote.title} — Taskapp`
         : 'Taskapp'
@@ -516,7 +669,9 @@ export function useWorkspace() {
     openFiles,
     openPaths,
     saveActive,
+    saveActiveAs,
     updateNoteContent,
+    updateViewerContent,
     renameNote,
     duplicateNote,
     showNoteFile,

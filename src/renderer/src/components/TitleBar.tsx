@@ -130,8 +130,8 @@ export function TitleBar({
       </div>
       <div className="titlebar-actions">
         <IconButton label="New note" onClick={onNew}><IconPlus /></IconButton>
-        <IconButton label="Open JSON or PDF" onClick={onOpen}><IconFolder /></IconButton>
-        <IconButton label="Save note" onClick={onSave}><IconSave /></IconButton>
+        <IconButton label="Open a file" onClick={onOpen}><IconFolder /></IconButton>
+        <IconButton label="Save" onClick={onSave}><IconSave /></IconButton>
         <IconButton label="Command palette" onClick={onPalette}><IconSearch /></IconButton>
         <IconButton label="Toggle theme" onClick={onTheme}>
           {theme === 'ink' ? <IconSun /> : <IconMoon />}

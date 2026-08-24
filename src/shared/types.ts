@@ -1,6 +1,6 @@
 export type ThemePreference = 'ink' | 'paper' | 'system'
-export type FileKind = 'text' | 'json' | 'pdf' | 'unsupported'
-export type ViewerKind = 'json' | 'pdf'
+export type FileKind = 'text' | 'text-file' | 'json' | 'pdf' | 'image' | 'unsupported'
+export type ViewerKind = 'json' | 'pdf' | 'image' | 'text-file'
 
 export interface FileTypeInfo {
   mime: string
@@ -69,12 +69,34 @@ export interface OpenPdfResult {
   data: Uint8Array
 }
 
+export interface OpenTextFileResult {
+  ok: true
+  kind: 'text-file'
+  path: string
+  name: string
+  mime: string
+  language: string
+  label: string
+  content: string
+}
+
+export interface OpenImageResult {
+  ok: true
+  kind: 'image'
+  path: string
+  name: string
+  mime: string
+  language: 'image'
+  label: string
+  data: Uint8Array
+}
+
 export interface OpenErrorResult {
   ok: false
   error: string
 }
 
-export type OpenFileResult = OpenTextResult | OpenJsonResult | OpenPdfResult | OpenErrorResult
+export type OpenFileResult = OpenTextResult | OpenJsonResult | OpenPdfResult | OpenTextFileResult | OpenImageResult | OpenErrorResult
 
 export interface WriteFileResult {
   ok: boolean
@@ -91,6 +113,7 @@ export type MenuCommand =
   | 'new'
   | 'open'
   | 'save'
+  | 'save-as'
   | 'close'
   | 'rename'
   | 'duplicate'

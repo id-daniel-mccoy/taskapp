@@ -1,8 +1,7 @@
-import { inspectJson } from '../lib/json'
-
 interface Props {
   name: string
   path: string
+  label: string
   content: string
   dirty: boolean
   wordWrap: boolean
@@ -10,8 +9,7 @@ interface Props {
   onChange: (value: string) => void
 }
 
-export function JsonViewer({ name, path, content, dirty, wordWrap, fontSize, onChange }: Props) {
-  const check = inspectJson(content)
+export function TextFileViewer({ name, path, label, content, dirty, wordWrap, fontSize, onChange }: Props) {
   return (
     <div className="file-viewer">
       <div className="file-viewer-banner">
@@ -19,9 +17,7 @@ export function JsonViewer({ name, path, content, dirty, wordWrap, fontSize, onC
           <strong>{dirty ? `• ${name}` : name}</strong>
           <span>{path}</span>
         </div>
-        <em className={check.ok ? 'ok' : 'bad'}>
-          {check.ok ? `JSON${dirty ? ' · unsaved' : ''}` : check.message}
-        </em>
+        <em>{label}{dirty ? ' · unsaved' : ''}</em>
       </div>
       <textarea
         className="file-viewer-body"

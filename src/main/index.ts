@@ -1,7 +1,7 @@
 import { app, BrowserWindow, Menu, dialog, ipcMain, shell, nativeTheme } from 'electron'
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { mkdir, open, readFile, stat, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { isAbsolute, join, resolve } from 'node:path'
 import { DIALOG_FILTERS, displayName, inferFileType } from '../shared/mime'
 import type { AppSettings, MenuCommand, OpenFileResult, RecentFile } from '../shared/types'
 import { createNote, deleteNote, isPlainTextNote, loadLibrary, notePath, notesDir, renameNote, writeNote } from './notes'
@@ -25,6 +25,7 @@ app.commandLine.appendSwitch('log-level', '3')
 
 const TEXT_LIMIT = 25 * 1024 * 1024
 const PDF_LIMIT = 80 * 1024 * 1024
+const IMAGE_LIMIT = 40 * 1024 * 1024
 const MAX_RECENTS = 16
 
 const defaultSettings: AppSettings = {
@@ -62,15 +63,79 @@ async function saveSettings(next: AppSettings): Promise<void> {
   await writeFile(settingsPath(), JSON.stringify(next, null, 2), 'utf8')
 }
 
-function looksLikeFileArg(value: string): boolean {
-  if (!value || value.startsWith('-')) return false
-  if (value.includes('electron')) return false
-  if (value.endsWith('.js') && value.includes('out/')) return false
-  return existsSync(value)
+function asOpenableFile(value: string, cwd = process.cwd()): string | null {
+  if (!value || value.startsWith('-')) return null
+  if (value === '.' || value === '..') return null
+  if (value === process.execPath) return null
+  if (value.endsWith('.js') && value.includes('out/')) return null
+  const full = isAbsolute(value) ? value : resolve(cwd, value)
+  try {
+    if (!statSync(full).isFile()) return null
+  } catch {
+    return null
+  }
+  return full
 }
 
-function collectOpenPaths(): string[] {
-  return process.argv.filter(looksLikeFileArg)
+function collectOpenPaths(argv: string[] = process.argv, cwd = process.cwd()): string[] {
+  const seen = new Set<string>()
+  const paths: string[] = []
+  for (const value of argv) {
+    const full = asOpenableFile(value, cwd)
+    if (!full || seen.has(full)) continue
+    seen.add(full)
+    paths.push(full)
+  }
+  return paths
+}
+
+let pendingOpen: string[] = []
+let rendererReady = false
+
+function instancePidPath(): string {
+  return join(app.getPath('userData'), 'instance.pid')
+}
+
+function writeInstancePid(): void {
+  try {
+    mkdirSync(app.getPath('userData'), { recursive: true })
+    writeFileSync(instancePidPath(), String(process.pid), 'utf8')
+  } catch {
+    // Launchers use this to forward Open with into the running window.
+  }
+}
+
+function clearInstancePid(): void {
+  try {
+    unlinkSync(instancePidPath())
+  } catch {
+    // already gone
+  }
+}
+
+function enqueueOpen(paths: string[]): void {
+  for (const filePath of paths) {
+    if (!pendingOpen.includes(filePath)) pendingOpen.push(filePath)
+  }
+  flushPendingOpen()
+}
+
+function flushPendingOpen(): void {
+  if (!rendererReady || !mainWindow || mainWindow.isDestroyed() || !pendingOpen.length) return
+  const paths = pendingOpen
+  pendingOpen = []
+  mainWindow.webContents.send('app:open-paths', paths)
+}
+
+function focusMainWindow(): void {
+  const win = mainWindow
+  if (!win || win.isDestroyed()) return
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.setAlwaysOnTop(true)
+  win.focus()
+  app.focus({ steal: true })
+  win.setAlwaysOnTop(false)
 }
 
 async function looksBinary(filePath: string): Promise<boolean> {
@@ -95,7 +160,24 @@ async function openPath(filePath: string): Promise<OpenFileResult> {
     if (type.kind === 'unsupported') {
       return {
         ok: false,
-        error: `${displayName(filePath)} looks like a binary file and is not a supported text or PDF type.`
+        error: `${displayName(filePath)} is not a supported note, text, PDF, or image file.`
+      }
+    }
+
+    if (type.kind === 'image') {
+      if (info.size > IMAGE_LIMIT) {
+        return { ok: false, error: 'This image is larger than the 40 MB viewing limit.' }
+      }
+      const data = await readFile(filePath)
+      return {
+        ok: true,
+        kind: 'image',
+        path: filePath,
+        name: displayName(filePath),
+        mime: type.mime,
+        language: 'image',
+        label: type.label,
+        data: new Uint8Array(data)
       }
     }
 
@@ -133,10 +215,10 @@ async function openPath(filePath: string): Promise<OpenFileResult> {
       }
     }
 
-    if (type.kind !== 'text' || !isPlainTextNote(filePath, type.mime)) {
+    if (type.kind !== 'text') {
       return {
         ok: false,
-        error: 'Notes are plain .txt files. JSON and PDF files can be opened for reading.'
+        error: 'That file type cannot be opened. Drop a note, text file, JSON, PDF, or image.'
       }
     }
 
@@ -148,18 +230,31 @@ async function openPath(filePath: string): Promise<OpenFileResult> {
     }
 
     if (info.size > TEXT_LIMIT) {
-      return { ok: false, error: 'This file is larger than the 25 MB text-editing limit.' }
+      return { ok: false, error: 'This file is larger than the 25 MB text-reading limit.' }
     }
 
     const content = await readFile(filePath, 'utf8')
+    if (isPlainTextNote(filePath, type.mime)) {
+      return {
+        ok: true,
+        kind: 'text',
+        path: filePath,
+        name: displayName(filePath),
+        mime: 'text/plain',
+        language: 'plaintext',
+        label: 'Plain Text',
+        content
+      }
+    }
+
     return {
       ok: true,
-      kind: 'text',
+      kind: 'text-file',
       path: filePath,
       name: displayName(filePath),
-      mime: 'text/plain',
-      language: 'plaintext',
-      label: 'Plain Text',
+      mime: type.mime,
+      language: type.language,
+      label: type.label,
       content
     }
   } catch (error) {
@@ -192,7 +287,8 @@ function buildMenu(): Menu {
             submenu: [
               { label: 'New note', accelerator: 'CmdOrCtrl+N', click: () => sendMenu('new') },
               { label: 'Open…', accelerator: 'CmdOrCtrl+O', click: () => sendMenu('open') },
-              { label: 'Save note', accelerator: 'CmdOrCtrl+S', click: () => sendMenu('save') },
+              { label: 'Save', accelerator: 'CmdOrCtrl+S', click: () => sendMenu('save') },
+              { label: 'Save as…', accelerator: 'CmdOrCtrl+Shift+S', click: () => sendMenu('save-as') },
               { label: 'Rename note', accelerator: 'F2', click: () => sendMenu('rename') },
               { label: 'Close viewer', accelerator: 'CmdOrCtrl+W', click: () => sendMenu('close') },
               { type: 'separator' },
@@ -208,7 +304,8 @@ function buildMenu(): Menu {
         ? [
             { label: 'New note', accelerator: 'CmdOrCtrl+N', click: () => sendMenu('new') },
             { label: 'Open…', accelerator: 'CmdOrCtrl+O', click: () => sendMenu('open') },
-            { label: 'Save note', accelerator: 'CmdOrCtrl+S', click: () => sendMenu('save') },
+            { label: 'Save', accelerator: 'CmdOrCtrl+S', click: () => sendMenu('save') },
+            { label: 'Save as…', accelerator: 'CmdOrCtrl+Shift+S', click: () => sendMenu('save-as') },
             { label: 'Rename note', accelerator: 'F2', click: () => sendMenu('rename') },
             { label: 'Close viewer', accelerator: 'CmdOrCtrl+W', click: () => sendMenu('close') },
             { type: 'separator' },
@@ -289,6 +386,13 @@ function createWindow(): BrowserWindow {
 }
 
 function registerIpc(): void {
+  ipcMain.handle('app:take-pending-opens', () => {
+    rendererReady = true
+    const paths = pendingOpen
+    pendingOpen = []
+    return paths
+  })
+
   ipcMain.handle('settings:get', () => loadSettings())
   ipcMain.handle('settings:set', async (_event, next: AppSettings) => {
     await saveSettings(next)
@@ -305,14 +409,30 @@ function registerIpc(): void {
     return { canceled: result.canceled, paths: result.filePaths }
   })
 
-  ipcMain.handle('dialog:save', async (_event, suggestedName?: string) => {
+  ipcMain.handle('dialog:save', async (_event, defaultPath?: string) => {
     if (!mainWindow) return { canceled: true }
     const result = await dialog.showSaveDialog(mainWindow, {
       title: 'Save as',
-      defaultPath: suggestedName || 'untitled.txt',
+      defaultPath: defaultPath || 'untitled.txt',
       filters: DIALOG_FILTERS
     })
     return { canceled: result.canceled, path: result.filePath }
+  })
+
+  ipcMain.handle('fs:write', async (_event, filePath: string, content: string) => {
+    if (!filePath || typeof filePath !== 'string' || typeof content !== 'string') {
+      return { ok: false, error: 'Could not save the file.' }
+    }
+    try {
+      const info = await stat(filePath).catch(() => null)
+      if (info?.isDirectory()) {
+        return { ok: false, error: 'Folders cannot be overwritten. Choose a file instead.' }
+      }
+      await writeFile(filePath, content, 'utf8')
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Could not save the file.' }
+    }
   })
 
   ipcMain.handle('fs:open', async (_event, filePath: string) => {
@@ -388,24 +508,30 @@ function registerIpc(): void {
 
 app.setName('Taskapp')
 
-app.whenReady().then(async () => {
-  registerIpc()
-  Menu.setApplicationMenu(buildMenu())
-  mainWindow = createWindow()
+if (!app.requestSingleInstanceLock()) {
+  app.exit(0)
+} else {
+  writeInstancePid()
 
-  const pending = collectOpenPaths()
-  mainWindow.webContents.on('did-finish-load', () => {
-    if (pending.length) {
-      mainWindow?.webContents.send('app:open-paths', pending)
-    }
+  app.on('second-instance', (_event, argv, cwd) => {
+    enqueueOpen(collectOpenPaths(argv, cwd))
+    focusMainWindow()
   })
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      mainWindow = createWindow()
-    }
+  app.whenReady().then(async () => {
+    registerIpc()
+    Menu.setApplicationMenu(buildMenu())
+    mainWindow = createWindow()
+    enqueueOpen(collectOpenPaths())
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        rendererReady = false
+        mainWindow = createWindow()
+      }
+    })
   })
-})
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
@@ -413,7 +539,9 @@ app.on('window-all-closed', () => {
 
 app.on('open-file', (event, filePath) => {
   event.preventDefault()
-  if (mainWindow) {
-    mainWindow.webContents.send('app:open-paths', [filePath])
-  }
+  enqueueOpen(collectOpenPaths([filePath]))
+})
+
+app.on('quit', () => {
+  clearInstancePid()
 })

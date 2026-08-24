@@ -17,7 +17,8 @@
   --danger-soft: rgba(212, 103, 106, 0.16);
   --shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
   --titlebar: 48px;
-  --rail: 56px;
+  --rail: 64px;
+  --sidebar: 252px;
   --status: 28px;
   --radius: 10px;
   --font-ui: "Source Sans 3", "Ubuntu", "Cantarell", "Noto Sans", "Segoe UI", sans-serif;
@@ -117,9 +118,9 @@ button {
 }
 
 .titlebar-brand img {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+  border-radius: 0;
 }
 
 .titlebar-center {
@@ -234,7 +235,19 @@ button {
 .shell {
   min-height: 0;
   display: grid;
-  grid-template-columns: var(--rail) 252px 1fr;
+  grid-template-columns: var(--rail) var(--sidebar) 1fr;
+  transition: grid-template-columns 0.18s ease;
+}
+
+.shell.notes-collapsed {
+  --sidebar: 0px;
+}
+
+.shell.notes-collapsed .notes-list {
+  overflow: hidden;
+  border-right-color: transparent;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .rail {
@@ -247,8 +260,8 @@ button {
 }
 
 .rail-btn {
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   border-radius: 12px;
   color: var(--faint);
   position: relative;
@@ -266,7 +279,7 @@ button {
 
 .rail-btn .soon {
   position: absolute;
-  left: 44px;
+  left: 52px;
   top: 50%;
   transform: translateY(-50%);
   background: var(--raised);
@@ -300,7 +313,9 @@ button {
 .notes-list {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   min-height: 0;
+  overflow: hidden;
   border-right: 1px solid var(--hairline);
   background: color-mix(in srgb, var(--surface) 78%, transparent);
   -webkit-app-region: no-drag;
@@ -665,6 +680,7 @@ button {
 
 .editor-host,
 .pdf-host,
+.image-host,
 .welcome,
 .overlay {
   position: absolute;
@@ -821,7 +837,8 @@ button {
   font-size: 12px;
 }
 
-.pdf-host {
+.pdf-host,
+.image-host {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
@@ -851,12 +868,23 @@ button {
   justify-content: center;
   height: 28px;
   min-width: 4.75rem;
-  padding: 0 4px;
+  padding: 0 8px;
+  border-radius: 8px;
   color: var(--muted);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   line-height: 1;
   text-align: center;
+}
+
+button.pdf-page-num:hover {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+button.pdf-page-num.on {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .pdf-scroll {
@@ -878,6 +906,57 @@ button {
   box-shadow: var(--shadow);
   border-radius: 2px;
   scroll-margin-top: 18px;
+}
+
+.image-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  z-index: 4;
+  overflow: visible;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.image-scroll {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px 48px;
+  background: var(--well);
+}
+
+.image-frame {
+  display: inline-flex;
+  max-width: none;
+  background-color: color-mix(in srgb, var(--text) 12%, var(--well));
+  background-image:
+    linear-gradient(45deg, color-mix(in srgb, var(--text) 22%, transparent) 25%, transparent 25%),
+    linear-gradient(-45deg, color-mix(in srgb, var(--text) 22%, transparent) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, color-mix(in srgb, var(--text) 22%, transparent) 75%),
+    linear-gradient(-45deg, transparent 75%, color-mix(in srgb, var(--text) 22%, transparent) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  box-shadow: var(--shadow);
+}
+
+.image-frame.is-fit {
+  max-width: min(100%, 1200px);
+  max-height: 100%;
+}
+
+.image-frame img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.image-frame.is-fit img {
+  max-height: calc(100vh - 180px);
+  width: auto;
+  object-fit: contain;
 }
 
 .status {

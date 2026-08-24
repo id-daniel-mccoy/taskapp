@@ -79,19 +79,31 @@ if [[ "$INSTALL_DESKTOP" -eq 1 && "$(uname -s)" == "Linux" ]]; then
   APP_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
   ICON_BASE="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor"
   mkdir -p "$APP_DIR" \
+    "$ICON_BASE/48x48/apps" \
+    "$ICON_BASE/64x64/apps" \
+    "$ICON_BASE/128x128/apps" \
     "$ICON_BASE/256x256/apps" \
     "$ICON_BASE/512x512/apps" \
     "$ICON_BASE/scalable/apps"
+  cp "$ROOT/resources/icons/icon-48.png" "$ICON_BASE/48x48/apps/taskapp.png"
+  cp "$ROOT/resources/icons/icon-64.png" "$ICON_BASE/64x64/apps/taskapp.png"
+  cp "$ROOT/resources/icons/icon-128.png" "$ICON_BASE/128x128/apps/taskapp.png"
   cp "$ROOT/resources/icons/icon-256.png" "$ICON_BASE/256x256/apps/taskapp.png"
   cp "$ROOT/resources/icons/icon-512.png" "$ICON_BASE/512x512/apps/taskapp.png"
   cp "$ROOT/resources/icon.svg" "$ICON_BASE/scalable/apps/taskapp.svg"
-  sed -e "s|@EXEC@|$ROOT/taskapp|g" -e "s|@ICON@|$ROOT/resources/icon.png|g" \
+  sed -e "s|@EXEC@|$ROOT/taskapp|g" \
+    -e "s|@ROOT@|$ROOT|g" \
     "$ROOT/linux/taskapp.desktop" > "$APP_DIR/taskapp.desktop"
+  chmod +x "$ROOT/taskapp"
+  rm -f "$ICON_BASE/icon-theme.cache"
   if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database "$APP_DIR" >/dev/null 2>&1 || true
   fi
   if command -v gtk-update-icon-cache >/dev/null 2>&1; then
-    gtk-update-icon-cache -f "$ICON_BASE" >/dev/null 2>&1 || true
+    gtk-update-icon-cache -f -t "$ICON_BASE" >/dev/null 2>&1 || true
+  fi
+  if command -v xdg-desktop-menu >/dev/null 2>&1; then
+    xdg-desktop-menu forceupdate >/dev/null 2>&1 || true
   fi
   echo "Added Taskapp to your application menu."
 fi

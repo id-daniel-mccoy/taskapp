@@ -26,7 +26,7 @@ export function TabBar({ docs, activeId, onSelect, onClose }: Props) {
             }
           }}
         >
-          <span>{doc.name}</span>
+          <span>{('dirty' in doc && doc.dirty) ? `• ${doc.name}` : doc.name}</span>
           <span
             className="tab-close"
             role="button"

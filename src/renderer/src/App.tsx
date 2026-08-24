@@ -1,18 +1,21 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { ActivityRail } from './components/ActivityRail'
 import { CommandPalette, ConfirmDialog, SettingsPanel, ShortcutsPanel } from './components/Overlays'
 import { JsonViewer } from './components/JsonViewer'
+import { ImageViewer } from './components/ImageViewer'
 import { NoteEditor } from './components/NoteEditor'
 import { NotesList } from './components/NotesList'
 import { PdfViewer } from './components/PdfViewer'
 import { StatusBar } from './components/StatusBar'
 import { TabBar } from './components/TabBar'
+import { TextFileViewer } from './components/TextFileViewer'
 import { TitleBar } from './components/TitleBar'
 import { Welcome } from './components/Welcome'
 import { useWorkspace } from './hooks/useWorkspace'
 
 export function App() {
   const workspace = useWorkspace()
+  const [notesOpen, setNotesOpen] = useState(true)
   const {
     activeNote,
     activeViewer,
@@ -22,6 +25,7 @@ export function App() {
     newNote,
     openFiles,
     saveActive,
+    saveActiveAs,
     closeViewer,
     handleMenu,
     setRenamingId
@@ -42,7 +46,10 @@ export function App() {
         event.preventDefault()
         void openFiles()
       }
-      if (meta && event.key.toLowerCase() === 's') {
+      if (meta && event.key.toLowerCase() === 's' && event.shiftKey) {
+        event.preventDefault()
+        void saveActiveAs()
+      } else if (meta && event.key.toLowerCase() === 's') {
         event.preventDefault()
         void saveActive()
       }
@@ -83,7 +90,7 @@ export function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [activeNote, activeViewer, closeViewer, handleMenu, newNote, openFiles, saveActive, setPaletteOpen, setRenamingId, setSettingsOpen, setShortcutsOpen])
+  }, [activeNote, activeViewer, closeViewer, handleMenu, newNote, openFiles, saveActive, saveActiveAs, setPaletteOpen, setRenamingId, setSettingsOpen, setShortcutsOpen])
 
   if (!workspace.ready) {
     return <div className="app" />
@@ -92,7 +99,26 @@ export function App() {
   const showWelcome = !activeNote && !activeViewer
 
   return (
-    <div className="app">
+    <div
+      className="app"
+      onDragOver={(event) => {
+        event.preventDefault()
+        event.dataTransfer.dropEffect = 'copy'
+      }}
+      onDrop={(event) => {
+        event.preventDefault()
+        const paths = [...event.dataTransfer.files]
+          .map((file) => {
+            try {
+              return window.taskapp.pathForFile(file)
+            } catch {
+              return ''
+            }
+          })
+          .filter(Boolean)
+        if (paths.length) void workspace.openPaths(paths)
+      }}
+    >
       <TitleBar
         note={activeNote}
         viewer={activeViewer}
@@ -106,8 +132,8 @@ export function App() {
         onSettings={() => workspace.setSettingsOpen(true)}
         onRename={(title) => activeNote && void workspace.renameNote(activeNote.id, title)}
       />
-      <div className="shell">
-        <ActivityRail />
+      <div className={`shell${notesOpen ? '' : ' notes-collapsed'}`}>
+        <ActivityRail notesOpen={notesOpen} onToggleNotes={() => setNotesOpen((open) => !open)} />
         <NotesList
           notes={workspace.notes}
           activeId={workspace.activeNoteId}
@@ -120,24 +146,9 @@ export function App() {
           onDuplicate={(id) => void workspace.duplicateNote(id)}
           onShowFile={(id) => void workspace.showNoteFile(id)}
           onDelete={workspace.requestDelete}
+          collapsed={!notesOpen}
         />
-        <main
-          className="workspace"
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={(event) => {
-            event.preventDefault()
-            const paths = [...event.dataTransfer.files]
-              .map((file) => {
-                try {
-                  return window.taskapp.pathForFile(file)
-                } catch {
-                  return ''
-                }
-              })
-              .filter(Boolean)
-            if (paths.length) void workspace.openPaths(paths)
-          }}
-        >
+        <main className="workspace">
           <TabBar
             docs={workspace.viewers}
             activeId={workspace.activeViewerId}
@@ -163,9 +174,30 @@ export function App() {
               />
             )}
             {activeViewer?.kind === 'json' && (
-              <JsonViewer name={activeViewer.name} path={activeViewer.path} content={activeViewer.content} />
+              <JsonViewer
+                name={activeViewer.name}
+                path={activeViewer.path}
+                content={activeViewer.content}
+                dirty={activeViewer.dirty}
+                wordWrap={workspace.settings.wordWrap}
+                fontSize={workspace.settings.fontSize}
+                onChange={workspace.updateViewerContent}
+              />
+            )}
+            {activeViewer?.kind === 'text-file' && (
+              <TextFileViewer
+                name={activeViewer.name}
+                path={activeViewer.path}
+                label={activeViewer.label}
+                content={activeViewer.content}
+                dirty={activeViewer.dirty}
+                wordWrap={workspace.settings.wordWrap}
+                fontSize={workspace.settings.fontSize}
+                onChange={workspace.updateViewerContent}
+              />
             )}
             {activeViewer?.kind === 'pdf' && <PdfViewer doc={activeViewer} />}
+            {activeViewer?.kind === 'image' && <ImageViewer doc={activeViewer} />}
             <div className="toasts">
               {workspace.toasts.map((item) => (
                 <div key={item.id} className={`toast ${item.tone}`}>{item.text}</div>
@@ -178,7 +210,7 @@ export function App() {
         note={activeNote && !activeViewer ? activeNote : null}
         viewer={activeViewer}
         wordWrap={workspace.settings.wordWrap}
-        saving={Boolean(activeNote?.dirty)}
+        saving={Boolean(activeNote?.dirty || (activeViewer && 'dirty' in activeViewer && activeViewer.dirty))}
       />
       {workspace.paletteOpen && (
         <CommandPalette onClose={() => workspace.setPaletteOpen(false)} onRun={workspace.handleMenu} />

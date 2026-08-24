@@ -30,7 +30,7 @@ const byExt: Record<string, FileTypeInfo> = {
   xml: { mime: 'application/xml', language: 'xml', kind: TEXT, label: 'XML' },
   xsl: { mime: 'application/xml', language: 'xml', kind: TEXT, label: 'XSL' },
   xsd: { mime: 'application/xml', language: 'xml', kind: TEXT, label: 'XSD' },
-  svg: { mime: 'image/svg+xml', language: 'xml', kind: TEXT, label: 'SVG' },
+  svg: { mime: 'image/svg+xml', language: 'image', kind: 'image', label: 'SVG' },
   csv: { mime: 'text/csv', language: 'plaintext', kind: TEXT, label: 'CSV' },
   tsv: { mime: 'text/tab-separated-values', language: 'plaintext', kind: TEXT, label: 'TSV' },
   yaml: { mime: 'application/yaml', language: 'yaml', kind: TEXT, label: 'YAML' },
@@ -91,7 +91,21 @@ const byExt: Record<string, FileTypeInfo> = {
   editorconfig: { mime: 'text/plain', language: 'ini', kind: TEXT, label: 'EditorConfig' },
   lock: { mime: 'text/plain', language: 'json', kind: TEXT, label: 'Lockfile' },
   map: { mime: 'application/json', language: 'json', kind: TEXT, label: 'Source Map' },
-  pdf: { mime: 'application/pdf', language: 'pdf', kind: 'pdf', label: 'PDF' }
+  pdf: { mime: 'application/pdf', language: 'pdf', kind: 'pdf', label: 'PDF' },
+  png: { mime: 'image/png', language: 'image', kind: 'image', label: 'PNG' },
+  apng: { mime: 'image/apng', language: 'image', kind: 'image', label: 'APNG' },
+  jpg: { mime: 'image/jpeg', language: 'image', kind: 'image', label: 'JPEG' },
+  jpeg: { mime: 'image/jpeg', language: 'image', kind: 'image', label: 'JPEG' },
+  jpe: { mime: 'image/jpeg', language: 'image', kind: 'image', label: 'JPEG' },
+  jfif: { mime: 'image/jpeg', language: 'image', kind: 'image', label: 'JPEG' },
+  gif: { mime: 'image/gif', language: 'image', kind: 'image', label: 'GIF' },
+  webp: { mime: 'image/webp', language: 'image', kind: 'image', label: 'WebP' },
+  bmp: { mime: 'image/bmp', language: 'image', kind: 'image', label: 'BMP' },
+  dib: { mime: 'image/bmp', language: 'image', kind: 'image', label: 'BMP' },
+  ico: { mime: 'image/x-icon', language: 'image', kind: 'image', label: 'Icon' },
+  avif: { mime: 'image/avif', language: 'image', kind: 'image', label: 'AVIF' },
+  tif: { mime: 'image/tiff', language: 'image', kind: 'image', label: 'TIFF' },
+  tiff: { mime: 'image/tiff', language: 'image', kind: 'image', label: 'TIFF' }
 }
 
 const byMime: Record<string, FileTypeInfo> = {}
@@ -117,9 +131,15 @@ byMime['text/x-python'] = byExt.py
 byMime['application/x-python'] = byExt.py
 byMime['text/x-java'] = byExt.java
 byMime['text/rtf'] = byExt.rtf
+byMime['image/jpg'] = byExt.jpg
+byMime['image/pjpeg'] = byExt.jpg
+byMime['image/x-png'] = byExt.png
+byMime['image/x-icon'] = byExt.ico
+byMime['image/vnd.microsoft.icon'] = byExt.ico
+byMime['image/svg+xml'] = byExt.svg
 
 const BINARY_EXT = new Set([
-  'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'tif', 'tiff', 'heic', 'avif',
+  'heic', 'heif',
   'mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac',
   'mp4', 'mov', 'mkv', 'webm', 'avi',
   'zip', 'tar', 'gz', 'bz2', 'xz', '7z', 'rar',
@@ -130,10 +150,11 @@ const BINARY_EXT = new Set([
 ])
 
 export const DIALOG_FILTERS = [
-  { name: 'Supported', extensions: ['txt', 'json', 'pdf'] },
+  { name: 'Supported', extensions: ['txt', 'md', 'json', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'svg', 'avif'] },
   { name: 'Notes (Text)', extensions: ['txt'] },
   { name: 'JSON', extensions: ['json'] },
   { name: 'PDF', extensions: ['pdf'] },
+  { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'svg', 'avif', 'tif', 'tiff'] },
   { name: 'All files', extensions: ['*'] }
 ]
 
@@ -148,6 +169,11 @@ export const DESKTOP_MIME_TYPES = [
   'text/calendar',
   'text/x-python',
   'text/x-sh',
+  'text/x-c',
+  'text/x-c++src',
+  'text/rust',
+  'text/x-go',
+  'text/x-java',
   'application/json',
   'application/xml',
   'application/javascript',
@@ -155,7 +181,18 @@ export const DESKTOP_MIME_TYPES = [
   'application/sql',
   'application/x-sh',
   'application/rtf',
-  'image/svg+xml'
+  'application/yaml',
+  'application/toml',
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'image/bmp',
+  'image/x-icon',
+  'image/vnd.microsoft.icon',
+  'image/svg+xml',
+  'image/avif',
+  'image/tiff'
 ]
 
 export function extensionOf(filePath: string): string {
@@ -179,6 +216,9 @@ export function inferFileType(filePath: string, mimeHint?: string): FileTypeInfo
     const normalized = mimeHint.split(';')[0].trim().toLowerCase()
     if (byMime[normalized]) return byMime[normalized]
     if (normalized === 'application/pdf') return byExt.pdf
+    if (normalized.startsWith('image/')) {
+      return byMime[normalized] ?? { mime: normalized, language: 'image', kind: 'image', label: 'Image' }
+    }
     if (normalized.startsWith('text/')) {
       return { mime: normalized, language: 'plaintext', kind: TEXT, label: 'Text' }
     }

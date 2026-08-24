@@ -11,7 +11,9 @@ export interface TaskappApi {
   getSettings: () => Promise<AppSettings>
   setSettings: (settings: AppSettings) => Promise<AppSettings>
   openDialog: () => Promise<{ canceled: boolean; paths: string[] }>
+  saveDialog: (defaultPath?: string) => Promise<{ canceled: boolean; path?: string }>
   openPath: (filePath: string) => Promise<OpenFileResult>
+  writeFile: (filePath: string, content: string) => Promise<{ ok: boolean; error?: string }>
   listNotes: () => Promise<NotesLibrary>
   createNote: (content?: string, title?: string, id?: string) => Promise<{ record: NoteRecord; content: string }>
   writeNote: (id: string, content: string) => Promise<{ ok: boolean; record?: NoteRecord; error?: string }>
@@ -29,6 +31,7 @@ export interface TaskappApi {
   allowClose: () => void
   onMenuCommand: (handler: (command: MenuCommand) => void) => () => void
   onOpenPaths: (handler: (paths: string[]) => void) => () => void
+  takePendingOpens: () => Promise<string[]>
   onCloseRequested: (handler: () => void) => () => void
 }
 
@@ -36,7 +39,9 @@ const api: TaskappApi = {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (settings) => ipcRenderer.invoke('settings:set', settings),
   openDialog: () => ipcRenderer.invoke('dialog:open'),
+  saveDialog: (defaultPath) => ipcRenderer.invoke('dialog:save', defaultPath),
   openPath: (filePath) => ipcRenderer.invoke('fs:open', filePath),
+  writeFile: (filePath, content) => ipcRenderer.invoke('fs:write', filePath, content),
   listNotes: () => ipcRenderer.invoke('notes:list'),
   createNote: (content, title, id) => ipcRenderer.invoke('notes:create', content, title, id),
   writeNote: (id, content) => ipcRenderer.invoke('notes:write', id, content),
@@ -62,6 +67,7 @@ const api: TaskappApi = {
     ipcRenderer.on('app:open-paths', listener)
     return () => ipcRenderer.removeListener('app:open-paths', listener)
   },
+  takePendingOpens: () => ipcRenderer.invoke('app:take-pending-opens'),
   onCloseRequested: (handler) => {
     const listener = () => handler()
     ipcRenderer.on('app:close-requested', listener)

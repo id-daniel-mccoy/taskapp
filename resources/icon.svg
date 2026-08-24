@@ -1,27 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
-  <!-- Transparent canvas. The squircle is the only opaque shape. -->
-  <defs>
-    <linearGradient id="plate" x1="180" y1="120" x2="860" y2="900" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#243140"/>
-      <stop offset="1" stop-color="#121920"/>
-    </linearGradient>
-    <linearGradient id="page" x1="300" y1="220" x2="720" y2="820" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFF8EC"/>
-      <stop offset="1" stop-color="#EFE2CB"/>
-    </linearGradient>
-    <linearGradient id="ink" x1="360" y1="430" x2="690" y2="610" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#E8B56A"/>
-      <stop offset="1" stop-color="#C4893A"/>
-    </linearGradient>
-  </defs>
-  <rect x="72" y="72" width="880" height="880" rx="196" fill="url(#plate)"/>
-  <g transform="rotate(-8 512 512)">
-    <rect x="292" y="236" width="440" height="552" rx="28" fill="url(#page)"/>
-    <path d="M668 236 L732 300 H688 C674 300 668 294 668 280 Z" fill="#D8C6A6"/>
-    <path d="M340 430 H620" stroke="#D7C7A8" stroke-width="10" stroke-linecap="round"/>
-    <path d="M340 500 H580" stroke="#D7C7A8" stroke-width="10" stroke-linecap="round"/>
-    <path d="M340 570 H540" stroke="#D7C7A8" stroke-width="10" stroke-linecap="round"/>
-    <path d="M360 470 C430 430 520 620 680 540" stroke="url(#ink)" stroke-width="18" stroke-linecap="round"/>
-    <circle cx="368" cy="688" r="18" fill="#D4A05A"/>
-  </g>
+  <!-- PNG sizes are the source of truth for the T (Corinthia Bold). -->
+  <rect x="80" y="80" width="864" height="864" rx="134" fill="#D4A05A"/>
 </svg>

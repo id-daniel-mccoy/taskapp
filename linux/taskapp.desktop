@@ -1,13 +1,15 @@
 [Desktop Entry]
 Name=Taskapp
 GenericName=Text Editor
-Comment=A refined notepad for text, JSON, and PDFs
-Exec=@EXEC@ %F
-Icon=@ICON@
+Comment=A notepad for notes, text files, JSON, PDFs, and images
+Exec="@EXEC@" %F
+TryExec=@EXEC@
+Path=@ROOT@
+Icon=taskapp
 Terminal=false
 Type=Application
 StartupNotify=true
 StartupWMClass=Taskapp
-Categories=Utility;TextEditor;Office;
-MimeType=text/plain;text/markdown;text/html;text/css;text/javascript;text/xml;text/csv;text/calendar;text/x-python;text/x-sh;application/json;application/xml;application/javascript;application/pdf;application/sql;application/x-sh;application/rtf;image/svg+xml;
-Keywords=notes;editor;json;pdf;notepad;markdown;
+Categories=Utility;TextEditor;Office;Viewer;
+MimeType=text/plain;text/markdown;text/html;text/css;text/javascript;text/xml;text/csv;text/calendar;text/x-python;text/x-sh;text/x-c;text/x-c++src;text/rust;text/x-go;text/x-java;application/json;application/xml;application/javascript;application/pdf;application/sql;application/x-sh;application/rtf;application/yaml;application/toml;image/png;image/jpeg;image/gif;image/webp;image/bmp;image/x-icon;image/vnd.microsoft.icon;image/svg+xml;image/avif;image/tiff;
+Keywords=notes;editor;json;pdf;notepad;markdown;image;png;

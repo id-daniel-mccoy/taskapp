@@ -15,6 +15,7 @@ interface Props {
   onDuplicate: (id: string) => void
   onShowFile: (id: string) => void
   onDelete: (id: string) => void
+  collapsed?: boolean
 }
 
 function createdLabel(createdAt: number): string {
@@ -42,7 +43,8 @@ export function NotesList({
   onCancelRename,
   onDuplicate,
   onShowFile,
-  onDelete
+  onDelete,
+  collapsed = false
 }: Props) {
   const [menu, setMenu] = useState<MenuState | null>(null)
   const renameField = useRef<HTMLInputElement>(null)
@@ -65,6 +67,10 @@ export function NotesList({
     }
   }, [menu])
 
+  useEffect(() => {
+    if (collapsed) setMenu(null)
+  }, [collapsed])
+
   const openMenu = (event: MouseEvent, noteId: string | null) => {
     event.preventDefault()
     event.stopPropagation()
@@ -78,7 +84,12 @@ export function NotesList({
   }
 
   return (
-    <aside className="notes-list" onContextMenu={(event) => openMenu(event, null)}>
+    <aside
+      className="notes-list"
+      aria-hidden={collapsed}
+      {...(collapsed ? { inert: '' } : {})}
+      onContextMenu={(event) => openMenu(event, null)}
+    >
       <div className="notes-list-head">
         <h2>Notes</h2>
         <IconButton label="New note" onClick={onNew}>

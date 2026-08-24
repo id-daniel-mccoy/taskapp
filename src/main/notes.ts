@@ -131,7 +131,7 @@ export async function deleteNote(id: string): Promise<void> {
   }
 }
 
-export function isPlainTextNote(filePath: string, mime: string): boolean {
+export function isPlainTextNote(filePath: string, _mime: string): boolean {
   const name = filePath.split(/[\\/]/).pop()?.toLowerCase() ?? ''
-  return mime === 'text/plain' || name.endsWith('.txt') || name.endsWith('.text')
+  return name.endsWith('.txt') || name.endsWith('.text')
 }

@@ -16,12 +16,12 @@ export function Welcome({ notes, onNew, onOpen, onOpenNote }: Props) {
           <img src={icon} alt="Taskapp" />
           <div>
             <h1>Taskapp</h1>
-            <p>Write notes as local .txt files. Open JSON and PDFs to read them — they are not notes.</p>
+            <p>Write notes as local .txt files. Drop or open JSON, PDFs, images, and other text files — text files can be edited and saved in place, but they are not notes.</p>
           </div>
         </div>
         <div className="welcome-actions">
           <button className="primary-btn" onClick={onNew}>New note</button>
-          <button className="ghost-btn" onClick={onOpen}>Open JSON or PDF</button>
+          <button className="ghost-btn" onClick={onOpen}>Open a file</button>
         </div>
         <div className="recents">
           <h2>Notes on this computer</h2>

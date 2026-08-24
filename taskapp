@@ -4,39 +4,191 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
-if [[ ! -d "$ROOT/node_modules" ]]; then
-  echo "Taskapp is not installed yet."
-  echo "Run: $ROOT/install.sh"
+notify() {
+  local message="$1"
+  echo "$message" >&2
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send --app-name=Taskapp --icon="$ROOT/resources/icon.png" "Taskapp" "$message" >/dev/null 2>&1 || true
+  fi
+}
+
+fail() {
+  notify "$1"
   exit 1
+}
+
+prepend_path() {
+  local dir="$1"
+  if [[ -d "$dir" ]]; then
+    case ":$PATH:" in
+      *":$dir:"*) ;;
+      *) PATH="$dir${PATH:+:$PATH}" ;;
+    esac
+  fi
+}
+
+# GNOME/KDE launchers do not source ~/.bashrc, so nvm's Node is usually missing.
+resolve_node() {
+  local bin dir nvm_dir ver
+
+  if command -v node >/dev/null 2>&1; then
+    command -v node
+    return 0
+  fi
+
+  nvm_dir="${NVM_DIR:-$HOME/.nvm}"
+  if [[ -d "$nvm_dir/versions/node" ]]; then
+    if [[ -f "$nvm_dir/alias/default" ]]; then
+      ver="$(tr -d '[:space:]' < "$nvm_dir/alias/default")"
+      for dir in "$nvm_dir/versions/node/$ver" "$nvm_dir/versions/node/v$ver" "$nvm_dir/versions/node/${ver#v}"; do
+        if [[ -x "$dir/bin/node" ]]; then
+          echo "$dir/bin/node"
+          return 0
+        fi
+      done
+    fi
+    dir="$(ls -1d "$nvm_dir/versions/node"/v* 2>/dev/null | sort -V | tail -1 || true)"
+    if [[ -n "$dir" && -x "$dir/bin/node" ]]; then
+      echo "$dir/bin/node"
+      return 0
+    fi
+  fi
+
+  for bin in \
+    "$HOME/.local/share/fnm/aliases/default/bin/node" \
+    "$HOME/.fnm/aliases/default/bin/node" \
+    "$HOME/.volta/bin/node" \
+    "$HOME/.local/bin/node" \
+    /usr/local/bin/node \
+    /usr/bin/node
+  do
+    if [[ -x "$bin" ]]; then
+      echo "$bin"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+if [[ ! -d "$ROOT/node_modules" ]]; then
+  fail "Taskapp is not installed yet. Run: $ROOT/install.sh"
 fi
 
-LAUNCHER="$ROOT/node_modules/.bin/electron-vite"
+NODE_BIN="$(resolve_node)" || fail "Node.js was not found. The applications menu does not load nvm, so install Node or run $ROOT/install.sh from a terminal."
+prepend_path "$(dirname "$NODE_BIN")"
+export PATH
+# Cursor/VS Code sets this so their own Electron acts like Node. Nested Taskapp
+# launches (applications menu, Open with, this terminal) must not inherit it.
+unset ELECTRON_RUN_AS_NODE
+
+ELECTRON_JS="$ROOT/node_modules/electron-vite/bin/electron-vite.js"
 ELECTRON_BIN="$ROOT/node_modules/electron/dist/electron"
-if [[ ! -x "$LAUNCHER" ]]; then
-  echo "electron-vite is missing. Re-run $ROOT/install.sh"
-  exit 1
+if [[ ! -f "$ELECTRON_JS" ]]; then
+  fail "electron-vite is missing. Re-run $ROOT/install.sh"
 fi
 if [[ ! -x "$ELECTRON_BIN" || ! -f "$ROOT/node_modules/electron/path.txt" ]]; then
-  echo "Electron's runtime is missing (npm installed the package, but not the app binary)."
-  echo "Run: $ROOT/install.sh"
-  exit 1
+  fail "Electron's runtime is missing. Re-run $ROOT/install.sh"
 fi
 export ELECTRON_EXEC_PATH="$ELECTRON_BIN"
 
-args=()
+decode_file_url() {
+  local value="$1"
+  if [[ "$value" != file://* ]]; then
+    printf '%s\n' "$value"
+    return 0
+  fi
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import sys; from urllib.parse import unquote, urlparse; print(unquote(urlparse(sys.argv[1]).path))' "$value"
+  else
+    printf '%s\n' "${value#file://}"
+  fi
+}
+
+electron_flags=()
+file_args=()
 if [[ "$(uname -s)" == "Linux" ]]; then
   SANDBOX="$ROOT/node_modules/electron/dist/chrome-sandbox"
   if [[ ! -u "$SANDBOX" ]]; then
-    args+=(--no-sandbox)
+    electron_flags+=(--no-sandbox)
   fi
 fi
 for value in "$@"; do
-  if [[ -e "$value" ]]; then
-    args+=("$(cd "$(dirname "$value")" && pwd)/$(basename "$value")")
+  value="$(decode_file_url "$value")"
+  if [[ -f "$value" ]]; then
+    file_args+=("$(cd "$(dirname "$value")" && pwd)/$(basename "$value")")
+  elif [[ -d "$value" ]]; then
+    continue
   else
-    args+=("$value")
+    electron_flags+=("$value")
   fi
 done
 
+if [[ ! -t 2 ]]; then
+  STATE="${XDG_STATE_HOME:-$HOME/.local/state}/taskapp"
+  mkdir -p "$STATE"
+  exec 2>>"$STATE/launch.log"
+fi
+
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/Taskapp"
+PIDFILE="$CONFIG_DIR/instance.pid"
+
+taskapp_is_running() {
+  local pid cmdline comm
+  if [[ -r "$PIDFILE" ]]; then
+    pid="$(tr -d '[:space:]' < "$PIDFILE")"
+    if [[ "$pid" =~ ^[0-9]+$ && -r "/proc/$pid/cmdline" ]]; then
+      cmdline="$(tr '\0' ' ' < "/proc/$pid/cmdline")"
+      if [[ "$cmdline" == *electron* ]]; then
+        return 0
+      fi
+    fi
+  fi
+  for cmdline in /proc/[0-9]*/cmdline; do
+    pid="${cmdline%/cmdline}"
+    pid="${pid##*/}"
+    [[ -r "/proc/$pid/comm" ]] || continue
+    comm="$(< "/proc/$pid/comm")"
+    [[ "$comm" == electron ]] || continue
+    grep -a -F -- "--user-data-dir=${CONFIG_DIR}" "$cmdline" >/dev/null 2>&1 && return 0
+  done
+  return 1
+}
+
+port_3000_busy() {
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltnH 'sport = :3000' 2>/dev/null | grep -q .
+    return
+  fi
+  bash -c 'echo > /dev/tcp/127.0.0.1/3000' >/dev/null 2>&1
+}
+
+wait_for_running() {
+  local i
+  for i in {1..25}; do
+    if taskapp_is_running; then
+      return 0
+    fi
+    sleep 0.2
+  done
+  return 1
+}
+
+forward_to_running() {
+  # A second electron-vite would fail on port 3000. Hand the files to the
+  # existing app via Electron's single-instance lock instead.
+  exec "$ELECTRON_BIN" "${electron_flags[@]}" "$ROOT" -- "${file_args[@]}"
+}
+
+if taskapp_is_running; then
+  forward_to_running
+fi
+if port_3000_busy; then
+  if wait_for_running; then
+    forward_to_running
+  fi
+  fail "Taskapp is already starting. Try Open with again in a moment."
+fi
+
 # Chromium on Linux often prints a harmless GPU vsync warning; keep the rest of stderr intact.
-exec "$LAUNCHER" dev -- "${args[@]}" 2> >(grep -v --line-buffered 'GetVSyncParametersIfAvailable' >&2)
+exec "$NODE_BIN" "$ELECTRON_JS" dev -- "${electron_flags[@]}" "${file_args[@]}" 2> >(grep -v --line-buffered 'GetVSyncParametersIfAvailable' >&2)

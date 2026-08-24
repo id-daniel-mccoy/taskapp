@@ -1,5 +1,7 @@
 export function noteEditor(): HTMLTextAreaElement | null {
-  return document.querySelector('textarea.note-editor')
+  const active = document.activeElement
+  if (active instanceof HTMLTextAreaElement) return active
+  return document.querySelector('textarea.note-editor, textarea.file-viewer-body')
 }
 
 export function runNoteEdit(action: 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'selectAll'): void {
