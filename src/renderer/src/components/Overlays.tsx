@@ -2,25 +2,36 @@ import { useEffect, useMemo, useState } from 'react'
 import type { AppSettings, MenuCommand, ThemePreference } from '@shared/types'
 
 interface Command {
-  id: MenuCommand | 'new' | 'open'
+  id: MenuCommand
   label: string
   shortcut?: string
+  group: 'Note' | 'Edit' | 'View'
 }
 
 const COMMANDS: Command[] = [
-  { id: 'new', label: 'New note', shortcut: 'Ctrl+N' },
-  { id: 'open', label: 'Open file', shortcut: 'Ctrl+O' },
-  { id: 'save', label: 'Save', shortcut: 'Ctrl+S' },
-  { id: 'save-as', label: 'Save as…', shortcut: 'Ctrl+Shift+S' },
-  { id: 'find', label: 'Find in note', shortcut: 'Ctrl+F' },
-  { id: 'toggle-theme', label: 'Toggle theme', shortcut: 'Ctrl+Shift+T' },
-  { id: 'toggle-wrap', label: 'Toggle word wrap', shortcut: 'Alt+Z' },
-  { id: 'format-json', label: 'Format JSON' },
-  { id: 'minify-json', label: 'Minify JSON' },
-  { id: 'validate-json', label: 'Validate JSON' },
-  { id: 'show-in-folder', label: 'Show in folder' },
-  { id: 'settings', label: 'Settings', shortcut: 'Ctrl+,' },
-  { id: 'shortcuts', label: 'Keyboard shortcuts', shortcut: 'Ctrl+/' }
+  { id: 'command-palette', label: 'Command palette', shortcut: 'Ctrl+K', group: 'Note' },
+  { id: 'new', label: 'New note', shortcut: 'Ctrl+N', group: 'Note' },
+  { id: 'save', label: 'Save note', shortcut: 'Ctrl+S', group: 'Note' },
+  { id: 'rename', label: 'Rename note', shortcut: 'F2', group: 'Note' },
+  { id: 'duplicate', label: 'Duplicate note', group: 'Note' },
+  { id: 'delete-note', label: 'Delete note', group: 'Note' },
+  { id: 'open', label: 'Open JSON or PDF', shortcut: 'Ctrl+O', group: 'Note' },
+  { id: 'close', label: 'Close viewer', shortcut: 'Ctrl+W', group: 'Note' },
+  { id: 'show-in-folder', label: 'Show in folder', group: 'Note' },
+  { id: 'show-notes-folder', label: 'Show notes folder', group: 'Note' },
+  { id: 'undo', label: 'Undo', shortcut: 'Ctrl+Z', group: 'Edit' },
+  { id: 'redo', label: 'Redo', shortcut: 'Ctrl+Shift+Z', group: 'Edit' },
+  { id: 'cut', label: 'Cut', shortcut: 'Ctrl+X', group: 'Edit' },
+  { id: 'copy', label: 'Copy', shortcut: 'Ctrl+C', group: 'Edit' },
+  { id: 'paste', label: 'Paste', shortcut: 'Ctrl+V', group: 'Edit' },
+  { id: 'select-all', label: 'Select all', shortcut: 'Ctrl+A', group: 'Edit' },
+  { id: 'find', label: 'Find', shortcut: 'Ctrl+F', group: 'Edit' },
+  { id: 'toggle-theme', label: 'Toggle theme', shortcut: 'Ctrl+Shift+T', group: 'View' },
+  { id: 'toggle-wrap', label: 'Toggle word wrap', shortcut: 'Alt+Z', group: 'View' },
+  { id: 'font-larger', label: 'Larger text', shortcut: 'Ctrl+=', group: 'View' },
+  { id: 'font-smaller', label: 'Smaller text', shortcut: 'Ctrl+-', group: 'View' },
+  { id: 'settings', label: 'Settings', shortcut: 'Ctrl+,', group: 'View' },
+  { id: 'shortcuts', label: 'Keyboard shortcuts', shortcut: 'Ctrl+/', group: 'View' }
 ]
 
 interface PaletteProps {
@@ -59,7 +70,7 @@ export function CommandPalette({ onClose, onRun }: PaletteProps) {
               setIndex((value) => Math.max(0, value - 1))
             }
             if (event.key === 'Enter' && matches[index]) {
-              onRun(matches[index].id as MenuCommand)
+              onRun(matches[index].id)
               onClose()
             }
           }}
@@ -70,11 +81,14 @@ export function CommandPalette({ onClose, onRun }: PaletteProps) {
               key={item.id + item.label}
               className={`palette-item${itemIndex === index ? ' active' : ''}`}
               onClick={() => {
-                onRun(item.id as MenuCommand)
+                onRun(item.id)
                 onClose()
               }}
             >
-              <span>{item.label}</span>
+              <span>
+                <em className="palette-group">{item.group}</em>
+                {item.label}
+              </span>
               {item.shortcut && <span className="kbd">{item.shortcut}</span>}
             </button>
           ))}
@@ -87,11 +101,13 @@ export function CommandPalette({ onClose, onRun }: PaletteProps) {
 
 interface SettingsProps {
   settings: AppSettings
+  notesDir: string
   onChange: (settings: AppSettings) => void
+  onShowNotes: () => void
   onClose: () => void
 }
 
-export function SettingsPanel({ settings, onChange, onClose }: SettingsProps) {
+export function SettingsPanel({ settings, notesDir, onChange, onShowNotes, onClose }: SettingsProps) {
   return (
     <div className="overlay" onMouseDown={onClose}>
       <div className="settings-panel" onMouseDown={(event) => event.stopPropagation()}>
@@ -125,6 +141,11 @@ export function SettingsPanel({ settings, onChange, onClose }: SettingsProps) {
             onChange={(event) => onChange({ ...settings, fontSize: Number(event.target.value) })}
           />
         </label>
+        <div className="field">
+          <span>Notes folder</span>
+          <button className="ghost-btn" onClick={onShowNotes}>Open</button>
+        </div>
+        <p className="empty-note">{notesDir}</p>
         <div className="confirm-actions">
           <button className="ghost-btn" onClick={onClose}>Done</button>
         </div>
@@ -155,12 +176,12 @@ export function ShortcutsPanel({ onClose }: { onClose: () => void }) {
 interface ConfirmProps {
   title: string
   body: string
-  onSave: () => void
-  onDiscard: () => void
+  confirmLabel?: string
+  onConfirm: () => void
   onCancel: () => void
 }
 
-export function ConfirmDialog({ title, body, onSave, onDiscard, onCancel }: ConfirmProps) {
+export function ConfirmDialog({ title, body, confirmLabel = 'Confirm', onConfirm, onCancel }: ConfirmProps) {
   return (
     <div className="overlay" onMouseDown={onCancel}>
       <div className="confirm" onMouseDown={(event) => event.stopPropagation()}>
@@ -168,8 +189,7 @@ export function ConfirmDialog({ title, body, onSave, onDiscard, onCancel }: Conf
         <p>{body}</p>
         <div className="confirm-actions">
           <button className="ghost-btn" onClick={onCancel}>Cancel</button>
-          <button className="ghost-btn" onClick={onDiscard}>Discard</button>
-          <button className="primary-btn" onClick={onSave}>Save</button>
+          <button className="primary-btn" onClick={onConfirm}>{confirmLabel}</button>
         </div>
       </div>
     </div>

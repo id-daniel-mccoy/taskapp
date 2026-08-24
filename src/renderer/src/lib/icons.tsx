@@ -121,3 +121,112 @@ export function IconSettings(props: IconProps) {
     </Svg>
   )
 }
+
+export function IconUndo(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M9 14 5 10l4-4" />
+      <path d="M5 10h9a5 5 0 1 1 0 10H9" />
+    </Svg>
+  )
+}
+
+export function IconRedo(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M15 14l4-4-4-4" />
+      <path d="M19 10h-9a5 5 0 1 0 0 10h5" />
+    </Svg>
+  )
+}
+
+export function IconCut(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="6" cy="6" r="2.5" />
+      <circle cx="6" cy="18" r="2.5" />
+      <path d="M8.2 7.8 20 19M8.2 16.2 20 5" />
+    </Svg>
+  )
+}
+
+export function IconCopy(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15V5h10" />
+    </Svg>
+  )
+}
+
+export function IconPaste(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M8 5h8" />
+      <path d="M9 4h6v3H9z" />
+      <rect x="5" y="7" width="14" height="13" rx="2" />
+    </Svg>
+  )
+}
+
+export function IconSelectAll(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" />
+      <rect x="8" y="8" width="8" height="8" rx="1" />
+    </Svg>
+  )
+}
+
+export function IconWrap(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M3 6h18M3 12h12a3 3 0 1 1 0 6h-4" />
+      <path d="M13 16l-2 2 2 2" />
+    </Svg>
+  )
+}
+
+export function IconFontSmaller(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M5 18 8.5 7h1.6L14 18" />
+      <path d="M6.4 14h5.8" />
+      <path d="M17 13h5" />
+    </Svg>
+  )
+}
+
+export function IconFontLarger(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 18 7.5 7h1.6L13 18" />
+      <path d="M5.4 14h5.8" />
+      <path d="M16.5 13h6M19.5 10v6" />
+    </Svg>
+  )
+}
+
+export function IconChevronLeft(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M15 6 9 12l6 6" />
+    </Svg>
+  )
+}
+
+export function IconChevronRight(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M9 6l6 6-6 6" />
+    </Svg>
+  )
+}
+
+export function IconMinus(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M5 12h14" />
+    </Svg>
+  )
+}

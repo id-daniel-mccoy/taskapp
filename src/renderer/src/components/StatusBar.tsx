@@ -1,35 +1,27 @@
-import { LANGUAGE_OPTIONS } from '@shared/mime'
-import type { WorkspaceDocument } from '../hooks/useWorkspace'
+import type { NoteDocument } from '@shared/types'
+import type { ViewerDoc } from '../hooks/useWorkspace'
 
 interface Props {
-  active: WorkspaceDocument | null
+  note: NoteDocument | null
+  viewer: ViewerDoc | null
   wordWrap: boolean
-  onLanguage: (language: string) => void
+  saving: boolean
 }
 
-export function StatusBar({ active, wordWrap, onLanguage }: Props) {
+export function StatusBar({ note, viewer, wordWrap, saving }: Props) {
+  const words = note ? note.content.trim().split(/\s+/).filter(Boolean).length : 0
   return (
     <footer className="status">
       <div className="status-left">
         <span>UTF-8</span>
-        <span>{active ? active.mime : 'Ready'}</span>
-        {active?.kind === 'text' && (
-          <span>Ln {active.cursor.line}, Col {active.cursor.column}</span>
-        )}
+        {note && <span>Plain text note</span>}
+        {viewer && <span>{viewer.kind === 'pdf' ? 'application/pdf' : 'application/json'}</span>}
+        {note && <span>{words} {words === 1 ? 'word' : 'words'}</span>}
       </div>
       <div className="status-right">
-        {active?.kind === 'text' && (
-          <select value={active.language} onChange={(event) => onLanguage(event.target.value)}>
-            {LANGUAGE_OPTIONS.map((option) => (
-              <option key={option.id} value={option.id}>{option.label}</option>
-            ))}
-            {!LANGUAGE_OPTIONS.some((option) => option.id === active.language) && (
-              <option value={active.language}>{active.label}</option>
-            )}
-          </select>
-        )}
-        <span>{active?.kind === 'pdf' ? 'Read only' : wordWrap ? 'Wrap' : 'No wrap'}</span>
-        <span>{active?.label ?? 'Taskapp'}</span>
+        {note && <span>{note.draft ? 'Name the note to save it' : saving ? 'Saving…' : 'Saved locally'}</span>}
+        {viewer && <span>Read only</span>}
+        <span>{note ? (wordWrap ? 'Wrap' : 'No wrap') : viewer ? viewer.kind.toUpperCase() : 'Taskapp'}</span>
       </div>
     </footer>
   )

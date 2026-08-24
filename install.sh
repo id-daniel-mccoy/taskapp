@@ -31,13 +31,67 @@ echo "Installing Taskapp into $ROOT"
 npm install
 chmod +x "$ROOT/taskapp" "$ROOT/install.sh"
 
+electron_ready() {
+  [[ -f "$ROOT/node_modules/electron/path.txt" && -x "$ROOT/node_modules/electron/dist/electron" ]]
+}
+
+extract_electron_zip() {
+  local zip="$1"
+  local dest="$ROOT/node_modules/electron/dist"
+  mkdir -p "$dest"
+  if command -v unzip >/dev/null 2>&1; then
+    unzip -o -q "$zip" -d "$dest"
+  else
+    python3 - "$zip" "$dest" <<'PY'
+import sys
+import zipfile
+
+with zipfile.ZipFile(sys.argv[1]) as archive:
+    archive.extractall(sys.argv[2])
+PY
+  fi
+  printf 'electron\n' > "$ROOT/node_modules/electron/path.txt"
+  chmod +x "$ROOT/node_modules/electron/dist/electron"
+}
+
+if ! electron_ready; then
+  echo "Downloading the Electron runtime (this can take a minute)…"
+  node "$ROOT/node_modules/electron/install.js" || true
+fi
+
+if ! electron_ready; then
+  CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/electron"
+  ZIP="$(find "$CACHE_DIR" -name 'electron-*-linux-*.zip' -type f 2>/dev/null | tail -1 || true)"
+  if [[ -n "${ZIP}" && -f "${ZIP}" ]]; then
+    echo "Finishing the Electron extract…"
+    extract_electron_zip "$ZIP"
+  fi
+fi
+
+if ! electron_ready; then
+  echo "Electron's runtime failed to install."
+  echo "Check your network, then re-run: $ROOT/install.sh"
+  echo "If GitHub releases are blocked, set ELECTRON_MIRROR and try again."
+  exit 1
+fi
+
 if [[ "$INSTALL_DESKTOP" -eq 1 && "$(uname -s)" == "Linux" ]]; then
   APP_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
-  mkdir -p "$APP_DIR"
+  ICON_BASE="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor"
+  mkdir -p "$APP_DIR" \
+    "$ICON_BASE/256x256/apps" \
+    "$ICON_BASE/512x512/apps" \
+    "$ICON_BASE/scalable/apps"
+  cp "$ROOT/resources/icons/icon-256.png" "$ICON_BASE/256x256/apps/taskapp.png"
+  cp "$ROOT/resources/icons/icon-512.png" "$ICON_BASE/512x512/apps/taskapp.png"
+  cp "$ROOT/resources/icon.svg" "$ICON_BASE/scalable/apps/taskapp.svg"
   sed -e "s|@EXEC@|$ROOT/taskapp|g" -e "s|@ICON@|$ROOT/resources/icon.png|g" \
     "$ROOT/linux/taskapp.desktop" > "$APP_DIR/taskapp.desktop"
   if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database "$APP_DIR" >/dev/null 2>&1 || true
+  fi
+  if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    gtk-update-icon-cache -f "$ICON_BASE" >/dev/null 2>&1 || true
   fi
   echo "Added Taskapp to your application menu."
 fi

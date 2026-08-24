@@ -1,6 +1,8 @@
 # Taskapp
 
-A Linux-first notepad with a paper-and-ink interface. It opens everyday text files, understands JSON, and can view PDFs. Tasks and reminders will come later; this first version is the editor.
+Write notes as local `.txt` files. JSON and PDF files can be opened for reading; they are not notes and are not stored in the notes library.
+
+Notes live in the app data folder on your computer (Settings → Open notes folder) and are still there after you quit.
 
 ## Install
 
@@ -19,7 +21,7 @@ That installs dependencies and adds a **Taskapp** entry to your application menu
 ./taskapp notes.md data.json report.pdf
 ```
 
-The first launch compiles the app and may take a few seconds.
+The first launch compiles the app and may take a few seconds. Locally, the renderer listens on `http://localhost:3000/`. The desktop window is the app; that URL is only the Vite development server Electron loads.
 
 `Ctrl+K` opens the command palette. `Ctrl+N`, `Ctrl+O`, and `Ctrl+S` create, open, and save.
 

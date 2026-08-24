@@ -11,12 +11,25 @@ if [[ ! -d "$ROOT/node_modules" ]]; then
 fi
 
 LAUNCHER="$ROOT/node_modules/.bin/electron-vite"
+ELECTRON_BIN="$ROOT/node_modules/electron/dist/electron"
 if [[ ! -x "$LAUNCHER" ]]; then
   echo "electron-vite is missing. Re-run $ROOT/install.sh"
   exit 1
 fi
+if [[ ! -x "$ELECTRON_BIN" || ! -f "$ROOT/node_modules/electron/path.txt" ]]; then
+  echo "Electron's runtime is missing (npm installed the package, but not the app binary)."
+  echo "Run: $ROOT/install.sh"
+  exit 1
+fi
+export ELECTRON_EXEC_PATH="$ELECTRON_BIN"
 
 args=()
+if [[ "$(uname -s)" == "Linux" ]]; then
+  SANDBOX="$ROOT/node_modules/electron/dist/chrome-sandbox"
+  if [[ ! -u "$SANDBOX" ]]; then
+    args+=(--no-sandbox)
+  fi
+fi
 for value in "$@"; do
   if [[ -e "$value" ]]; then
     args+=("$(cd "$(dirname "$value")" && pwd)/$(basename "$value")")
@@ -25,4 +38,5 @@ for value in "$@"; do
   fi
 done
 
-exec "$LAUNCHER" dev -- "${args[@]}"
+# Chromium on Linux often prints a harmless GPU vsync warning; keep the rest of stderr intact.
+exec "$LAUNCHER" dev -- "${args[@]}" 2> >(grep -v --line-buffered 'GetVSyncParametersIfAvailable' >&2)

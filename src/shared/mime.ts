@@ -23,10 +23,10 @@ const byExt: Record<string, FileTypeInfo> = {
   jsx: { mime: 'text/javascript', language: 'javascript', kind: TEXT, label: 'JavaScript' },
   ts: { mime: 'text/typescript', language: 'typescript', kind: TEXT, label: 'TypeScript' },
   tsx: { mime: 'text/typescript', language: 'typescript', kind: TEXT, label: 'TypeScript' },
-  json: { mime: 'application/json', language: 'json', kind: TEXT, label: 'JSON' },
-  jsonc: { mime: 'application/json', language: 'json', kind: TEXT, label: 'JSON' },
-  json5: { mime: 'application/json5', language: 'json', kind: TEXT, label: 'JSON5' },
-  geojson: { mime: 'application/geo+json', language: 'json', kind: TEXT, label: 'GeoJSON' },
+  json: { mime: 'application/json', language: 'json', kind: 'json', label: 'JSON' },
+  jsonc: { mime: 'application/json', language: 'json', kind: 'json', label: 'JSON' },
+  json5: { mime: 'application/json5', language: 'json', kind: 'json', label: 'JSON5' },
+  geojson: { mime: 'application/geo+json', language: 'json', kind: 'json', label: 'GeoJSON' },
   xml: { mime: 'application/xml', language: 'xml', kind: TEXT, label: 'XML' },
   xsl: { mime: 'application/xml', language: 'xml', kind: TEXT, label: 'XSL' },
   xsd: { mime: 'application/xml', language: 'xml', kind: TEXT, label: 'XSD' },
@@ -130,21 +130,10 @@ const BINARY_EXT = new Set([
 ])
 
 export const DIALOG_FILTERS = [
-  {
-    name: 'All supported',
-    extensions: [
-      'txt', 'md', 'markdown', 'json', 'pdf', 'html', 'htm', 'css', 'js', 'ts', 'tsx',
-      'xml', 'svg', 'csv', 'yml', 'yaml', 'py', 'sh', 'sql', 'rs', 'go', 'java', 'c',
-      'cpp', 'h', 'rb', 'php', 'toml', 'ini', 'log', 'rtf', 'tex', 'ics'
-    ]
-  },
-  { name: 'Text', extensions: ['txt', 'text', 'log'] },
-  { name: 'Markdown', extensions: ['md', 'markdown'] },
-  { name: 'JSON', extensions: ['json', 'jsonc', 'geojson'] },
+  { name: 'Supported', extensions: ['txt', 'json', 'pdf'] },
+  { name: 'Notes (Text)', extensions: ['txt'] },
+  { name: 'JSON', extensions: ['json'] },
   { name: 'PDF', extensions: ['pdf'] },
-  { name: 'Web', extensions: ['html', 'htm', 'css', 'js', 'ts', 'tsx', 'svg'] },
-  { name: 'Data', extensions: ['xml', 'csv', 'tsv', 'yml', 'yaml', 'toml'] },
-  { name: 'Source', extensions: ['py', 'rs', 'go', 'java', 'c', 'cpp', 'h', 'rb', 'php', 'sh'] },
   { name: 'All files', extensions: ['*'] }
 ]
 

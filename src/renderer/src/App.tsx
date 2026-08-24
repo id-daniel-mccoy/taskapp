@@ -1,10 +1,12 @@
 import { useEffect } from 'react'
 import { ActivityRail } from './components/ActivityRail'
 import { CommandPalette, ConfirmDialog, SettingsPanel, ShortcutsPanel } from './components/Overlays'
+import { JsonViewer } from './components/JsonViewer'
+import { NoteEditor } from './components/NoteEditor'
+import { NotesList } from './components/NotesList'
 import { PdfViewer } from './components/PdfViewer'
 import { StatusBar } from './components/StatusBar'
 import { TabBar } from './components/TabBar'
-import { TextEditor } from './components/TextEditor'
 import { TitleBar } from './components/TitleBar'
 import { Welcome } from './components/Welcome'
 import { useWorkspace } from './hooks/useWorkspace'
@@ -12,14 +14,17 @@ import { useWorkspace } from './hooks/useWorkspace'
 export function App() {
   const workspace = useWorkspace()
   const {
-    active,
+    activeNote,
+    activeViewer,
     setPaletteOpen,
     setSettingsOpen,
     setShortcutsOpen,
     newNote,
     openFiles,
-    saveDocument,
-    requestClose
+    saveActive,
+    closeViewer,
+    handleMenu,
+    setRenamingId
   } = workspace
 
   useEffect(() => {
@@ -31,7 +36,7 @@ export function App() {
       }
       if (meta && event.key.toLowerCase() === 'n') {
         event.preventDefault()
-        newNote()
+        void newNote()
       }
       if (meta && event.key.toLowerCase() === 'o') {
         event.preventDefault()
@@ -39,11 +44,27 @@ export function App() {
       }
       if (meta && event.key.toLowerCase() === 's') {
         event.preventDefault()
-        if (active) void saveDocument(active, event.shiftKey)
+        void saveActive()
+      }
+      if (meta && event.key.toLowerCase() === 'f') {
+        event.preventDefault()
+        handleMenu('find')
       }
       if (meta && event.key.toLowerCase() === 'w') {
         event.preventDefault()
-        if (active) requestClose(active.id)
+        if (activeViewer) closeViewer(activeViewer.id)
+      }
+      if (event.key === 'F2') {
+        event.preventDefault()
+        handleMenu('rename')
+      }
+      if (meta && (event.key === '=' || event.key === '+')) {
+        event.preventDefault()
+        handleMenu('font-larger')
+      }
+      if (meta && event.key === '-') {
+        event.preventDefault()
+        handleMenu('font-smaller')
       }
       if (meta && event.key === ',') {
         event.preventDefault()
@@ -57,30 +78,49 @@ export function App() {
         setPaletteOpen(false)
         setSettingsOpen(false)
         setShortcutsOpen(false)
+        setRenamingId(null)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [active, newNote, openFiles, requestClose, saveDocument, setPaletteOpen, setSettingsOpen, setShortcutsOpen])
+  }, [activeNote, activeViewer, closeViewer, handleMenu, newNote, openFiles, saveActive, setPaletteOpen, setRenamingId, setSettingsOpen, setShortcutsOpen])
 
   if (!workspace.ready) {
     return <div className="app" />
   }
 
+  const showWelcome = !activeNote && !activeViewer
+
   return (
     <div className="app">
       <TitleBar
-        active={workspace.active}
+        note={activeNote}
+        viewer={activeViewer}
         theme={workspace.theme}
-        onNew={workspace.newNote}
+        titleFocusKey={workspace.titleFocusKey}
+        onNew={() => void workspace.newNote()}
         onOpen={() => void workspace.openFiles()}
-        onSave={() => workspace.active && void workspace.saveDocument(workspace.active)}
+        onSave={() => void workspace.saveActive()}
         onPalette={() => workspace.setPaletteOpen(true)}
         onTheme={() => workspace.handleMenu('toggle-theme')}
         onSettings={() => workspace.setSettingsOpen(true)}
+        onRename={(title) => activeNote && void workspace.renameNote(activeNote.id, title)}
       />
       <div className="shell">
         <ActivityRail />
+        <NotesList
+          notes={workspace.notes}
+          activeId={workspace.activeNoteId}
+          renamingId={workspace.renamingId}
+          onSelect={workspace.selectNote}
+          onNew={() => void workspace.newNote()}
+          onRename={(id, title) => void workspace.renameNote(id, title)}
+          onStartRename={workspace.setRenamingId}
+          onCancelRename={() => workspace.setRenamingId(null)}
+          onDuplicate={(id) => void workspace.duplicateNote(id)}
+          onShowFile={(id) => void workspace.showNoteFile(id)}
+          onDelete={workspace.requestDelete}
+        />
         <main
           className="workspace"
           onDragOver={(event) => event.preventDefault()}
@@ -99,36 +139,33 @@ export function App() {
           }}
         >
           <TabBar
-            docs={workspace.docs}
-            activeId={workspace.activeId}
-            onSelect={workspace.setActiveId}
-            onClose={workspace.requestClose}
-            onNew={workspace.newNote}
+            docs={workspace.viewers}
+            activeId={workspace.activeViewerId}
+            onSelect={workspace.setActiveViewerId}
+            onClose={workspace.closeViewer}
           />
           <section className="stage">
-            {!workspace.active && (
+            {showWelcome && (
               <Welcome
-                recents={workspace.settings.recents}
-                onNew={workspace.newNote}
+                notes={workspace.notes}
+                onNew={() => void workspace.newNote()}
                 onOpen={() => void workspace.openFiles()}
-                onOpenPath={(path) => void workspace.openPaths([path])}
+                onOpenNote={workspace.selectNote}
               />
             )}
-            {workspace.active?.kind === 'text' && (
-              <TextEditor
-                doc={workspace.active}
-                theme={workspace.theme}
+            {activeNote && !activeViewer && (
+              <NoteEditor
+                note={activeNote}
                 wordWrap={workspace.settings.wordWrap}
                 fontSize={workspace.settings.fontSize}
-                jsonState={workspace.jsonState}
-                onChange={workspace.updateActiveContent}
-                onCursor={workspace.updateCursor}
-                onFormat={() => workspace.applyJson('format')}
-                onMinify={() => workspace.applyJson('minify')}
-                onValidate={() => workspace.applyJson('validate')}
+                onChange={workspace.updateNoteContent}
+                onCommand={(command) => workspace.handleMenu(command)}
               />
             )}
-            {workspace.active?.kind === 'pdf' && <PdfViewer doc={workspace.active} />}
+            {activeViewer?.kind === 'json' && (
+              <JsonViewer name={activeViewer.name} path={activeViewer.path} content={activeViewer.content} />
+            )}
+            {activeViewer?.kind === 'pdf' && <PdfViewer doc={activeViewer} />}
             <div className="toasts">
               {workspace.toasts.map((item) => (
                 <div key={item.id} className={`toast ${item.tone}`}>{item.text}</div>
@@ -138,9 +175,10 @@ export function App() {
         </main>
       </div>
       <StatusBar
-        active={workspace.active}
+        note={activeNote && !activeViewer ? activeNote : null}
+        viewer={activeViewer}
         wordWrap={workspace.settings.wordWrap}
-        onLanguage={workspace.setLanguage}
+        saving={Boolean(activeNote?.dirty)}
       />
       {workspace.paletteOpen && (
         <CommandPalette onClose={() => workspace.setPaletteOpen(false)} onRun={workspace.handleMenu} />
@@ -148,29 +186,22 @@ export function App() {
       {workspace.settingsOpen && (
         <SettingsPanel
           settings={workspace.settings}
+          notesDir={workspace.notesDir}
           onChange={(next) => void workspace.persistSettings(next)}
+          onShowNotes={() => void window.taskapp.showNotesFolder()}
           onClose={() => workspace.setSettingsOpen(false)}
         />
       )}
       {workspace.shortcutsOpen && (
         <ShortcutsPanel onClose={() => workspace.setShortcutsOpen(false)} />
       )}
-      {workspace.pendingClose && (
+      {workspace.pendingDelete && (
         <ConfirmDialog
-          title="Save this note?"
-          body="There are unsaved changes. Save them before closing the tab?"
-          onSave={() => void workspace.confirmClose(true)}
-          onDiscard={() => void workspace.confirmClose(false)}
-          onCancel={() => workspace.setPendingClose(null)}
-        />
-      )}
-      {workspace.pendingWindowClose && (
-        <ConfirmDialog
-          title="Quit Taskapp?"
-          body="Some notes are unsaved. Save them before quitting?"
-          onSave={() => void workspace.confirmWindowClose(true)}
-          onDiscard={() => void workspace.confirmWindowClose(false)}
-          onCancel={() => workspace.setPendingWindowClose(false)}
+          title="Delete this note?"
+          body="The .txt file will be removed from Taskapp’s notes folder on this computer."
+          confirmLabel="Delete"
+          onConfirm={() => void workspace.confirmDelete()}
+          onCancel={() => workspace.setPendingDelete(null)}
         />
       )}
     </div>

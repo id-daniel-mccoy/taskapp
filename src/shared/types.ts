@@ -1,6 +1,6 @@
 export type ThemePreference = 'ink' | 'paper' | 'system'
-export type DocumentKind = 'text' | 'pdf'
-export type FileKind = 'text' | 'pdf' | 'unsupported'
+export type FileKind = 'text' | 'json' | 'pdf' | 'unsupported'
+export type ViewerKind = 'json' | 'pdf'
 
 export interface FileTypeInfo {
   mime: string
@@ -23,6 +23,19 @@ export interface AppSettings {
   recents: RecentFile[]
 }
 
+export interface NoteRecord {
+  id: string
+  title: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface NoteDocument extends NoteRecord {
+  content: string
+  dirty: boolean
+  draft?: boolean
+}
+
 export interface OpenTextResult {
   ok: true
   kind: 'text'
@@ -30,6 +43,17 @@ export interface OpenTextResult {
   name: string
   mime: string
   language: string
+  label: string
+  content: string
+}
+
+export interface OpenJsonResult {
+  ok: true
+  kind: 'json'
+  path: string
+  name: string
+  mime: string
+  language: 'json'
   label: string
   content: string
 }
@@ -50,36 +74,40 @@ export interface OpenErrorResult {
   error: string
 }
 
-export type OpenFileResult = OpenTextResult | OpenPdfResult | OpenErrorResult
+export type OpenFileResult = OpenTextResult | OpenJsonResult | OpenPdfResult | OpenErrorResult
 
 export interface WriteFileResult {
   ok: boolean
   error?: string
 }
 
-export interface SaveDialogResult {
-  canceled: boolean
-  path?: string
-}
-
-export interface OpenDialogResult {
-  canceled: boolean
-  paths: string[]
+export interface NotesLibrary {
+  dir: string
+  notes: NoteRecord[]
+  contents: Record<string, string>
 }
 
 export type MenuCommand =
   | 'new'
   | 'open'
   | 'save'
-  | 'save-as'
   | 'close'
+  | 'rename'
+  | 'duplicate'
+  | 'delete-note'
+  | 'undo'
+  | 'redo'
+  | 'cut'
+  | 'copy'
+  | 'paste'
+  | 'select-all'
   | 'find'
   | 'command-palette'
   | 'toggle-theme'
   | 'toggle-wrap'
+  | 'font-larger'
+  | 'font-smaller'
   | 'settings'
-  | 'format-json'
-  | 'minify-json'
-  | 'validate-json'
   | 'show-in-folder'
+  | 'show-notes-folder'
   | 'shortcuts'

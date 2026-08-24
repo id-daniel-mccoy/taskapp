@@ -1,15 +1,14 @@
-import { IconPlus, IconX } from '../lib/icons'
-import type { WorkspaceDocument } from '../hooks/useWorkspace'
+import { IconX } from '../lib/icons'
+import type { ViewerDoc } from '../hooks/useWorkspace'
 
 interface Props {
-  docs: WorkspaceDocument[]
+  docs: ViewerDoc[]
   activeId: string | null
   onSelect: (id: string) => void
   onClose: (id: string) => void
-  onNew: () => void
 }
 
-export function TabBar({ docs, activeId, onSelect, onClose, onNew }: Props) {
+export function TabBar({ docs, activeId, onSelect, onClose }: Props) {
   if (!docs.length) return null
   return (
     <div className="tabbar" role="tablist">
@@ -27,7 +26,6 @@ export function TabBar({ docs, activeId, onSelect, onClose, onNew }: Props) {
             }
           }}
         >
-          {doc.dirty && <i className="dirty" />}
           <span>{doc.name}</span>
           <span
             className="tab-close"
@@ -42,9 +40,6 @@ export function TabBar({ docs, activeId, onSelect, onClose, onNew }: Props) {
           </span>
         </button>
       ))}
-      <button className="icon-btn tab-add" title="New note" onClick={onNew}>
-        <IconPlus />
-      </button>
     </div>
   )
 }

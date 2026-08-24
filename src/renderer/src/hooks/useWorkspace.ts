@@ -1,21 +1,33 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { displayName, inferFileType, isJsonLike } from '@shared/mime'
-import type { AppSettings, DocumentKind, MenuCommand, OpenFileResult, ThemePreference } from '@shared/types'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type {
+  AppSettings,
+  MenuCommand,
+  NoteDocument,
+  OpenFileResult,
+  ThemePreference
+} from '@shared/types'
 import { inspectJson } from '../lib/json'
+import { runNoteEdit } from '../lib/edit'
 
-export interface WorkspaceDocument {
+export interface JsonViewerDoc {
   id: string
-  path: string | null
+  kind: 'json'
+  path: string
   name: string
   mime: string
-  language: string
-  label: string
-  kind: DocumentKind
   content: string
-  pdfData?: Uint8Array
-  dirty: boolean
-  cursor: { line: number; column: number }
 }
+
+export interface PdfViewerDoc {
+  id: string
+  kind: 'pdf'
+  path: string
+  name: string
+  mime: 'application/pdf'
+  pdfData: Uint8Array
+}
+
+export type ViewerDoc = JsonViewerDoc | PdfViewerDoc
 
 interface Toast {
   id: string
@@ -26,19 +38,12 @@ interface Toast {
 const emptySettings: AppSettings = {
   theme: 'system',
   wordWrap: true,
-  fontSize: 15,
+  fontSize: 16,
   recents: []
 }
 
 function uid(): string {
   return crypto.randomUUID()
-}
-
-function untitledName(existing: WorkspaceDocument[]): string {
-  const used = new Set(existing.map((doc) => doc.name))
-  let index = 1
-  while (used.has(`Untitled-${index}`)) index += 1
-  return `Untitled-${index}`
 }
 
 function asBytes(data: Uint8Array | ArrayBuffer | number[]): Uint8Array {
@@ -47,54 +52,39 @@ function asBytes(data: Uint8Array | ArrayBuffer | number[]): Uint8Array {
   return Uint8Array.from(data)
 }
 
-function resultToDocument(result: Extract<OpenFileResult, { ok: true }>): WorkspaceDocument {
-  if (result.kind === 'pdf') {
-    return {
-      id: uid(),
-      path: result.path,
-      name: result.name,
-      mime: result.mime,
-      language: 'pdf',
-      label: result.label,
-      kind: 'pdf',
-      content: '',
-      pdfData: asBytes(result.data),
-      dirty: false,
-      cursor: { line: 1, column: 1 }
-    }
-  }
-  return {
-    id: uid(),
-    path: result.path,
-    name: result.name,
-    mime: result.mime,
-    language: result.language,
-    label: result.label,
-    kind: 'text',
-    content: result.content,
-    dirty: false,
-    cursor: { line: 1, column: 1 }
-  }
-}
-
 function resolveTheme(preference: ThemePreference): 'ink' | 'paper' {
   if (preference === 'ink' || preference === 'paper') return preference
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'ink' : 'paper'
 }
 
+function copyTitle(title: string, notes: NoteDocument[]): string {
+  const base = `${title} copy`
+  if (!notes.some((note) => note.title === base)) return base
+  let index = 2
+  while (notes.some((note) => note.title === `${title} copy ${index}`)) index += 1
+  return `${title} copy ${index}`
+}
+
 export function useWorkspace() {
   const [settings, setSettings] = useState<AppSettings>(emptySettings)
-  const [docs, setDocs] = useState<WorkspaceDocument[]>([])
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [notes, setNotes] = useState<NoteDocument[]>([])
+  const [viewers, setViewers] = useState<ViewerDoc[]>([])
+  const [activeNoteId, setActiveNoteId] = useState<string | null>(null)
+  const [activeViewerId, setActiveViewerId] = useState<string | null>(null)
+  const [notesDir, setNotesDir] = useState('')
   const [toasts, setToasts] = useState<Toast[]>([])
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
-  const [pendingClose, setPendingClose] = useState<string | null>(null)
-  const [pendingWindowClose, setPendingWindowClose] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null)
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [titleFocusKey, setTitleFocusKey] = useState(0)
   const [ready, setReady] = useState(false)
+  const saveTimers = useRef(new Map<string, number>())
+  const draftIds = useRef(new Set<string>())
 
-  const active = docs.find((doc) => doc.id === activeId) ?? null
+  const activeNote = notes.find((note) => note.id === activeNoteId) ?? null
+  const activeViewer = viewers.find((doc) => doc.id === activeViewerId) ?? null
   const theme = resolveTheme(settings.theme)
 
   const toast = useCallback((text: string, tone: Toast['tone'] = 'info') => {
@@ -110,221 +100,348 @@ export function useWorkspace() {
     await window.taskapp.setSettings(next)
   }, [])
 
-  const applyOpenResult = useCallback((result: OpenFileResult) => {
+  const flushNote = useCallback(async (id: string, content: string) => {
+    const timer = saveTimers.current.get(id)
+    if (timer) {
+      window.clearTimeout(timer)
+      saveTimers.current.delete(id)
+    }
+    const result = await window.taskapp.writeNote(id, content)
+    if (!result.ok || !result.record) {
+      toast(result.error || 'Could not save the note.', 'error')
+      return false
+    }
+    setNotes((current) =>
+      current.map((note) =>
+        note.id === id
+          ? { ...note, content, dirty: false, updatedAt: result.record.updatedAt }
+          : note
+      )
+    )
+    return true
+  }, [toast])
+
+  const persistDraft = useCallback(async (id: string, title?: string) => {
+    const current = notes.find((note) => note.id === id)
+    if (!current) return false
+    if (!current.draft && !draftIds.current.has(id)) return true
+    const nextTitle = (title ?? current.title).trim().slice(0, 80) || 'Untitled note'
+    try {
+      const created = await window.taskapp.createNote(current.content, nextTitle, current.id)
+      draftIds.current.delete(id)
+      setNotes((currentNotes) =>
+        currentNotes.map((note) =>
+          note.id === id
+            ? { ...created.record, content: created.content, dirty: false }
+            : note
+        )
+      )
+      if (created.record.id !== id) {
+        setActiveNoteId((currentId) => (currentId === id ? created.record.id : currentId))
+      }
+      return true
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Could not create the note.', 'error')
+      return false
+    }
+  }, [notes, toast])
+
+  const flushAllDirty = useCallback(async () => {
+    for (const note of notes) {
+      if (note.draft) {
+        const saved = await persistDraft(note.id)
+        if (!saved) return false
+        continue
+      }
+      if (!note.dirty) continue
+      const saved = await flushNote(note.id, note.content)
+      if (!saved) return false
+    }
+    return true
+  }, [flushNote, notes, persistDraft])
+
+  const selectNote = useCallback((id: string) => {
+    setActiveNoteId(id)
+    setActiveViewerId(null)
+  }, [])
+
+  const newNote = useCallback(() => {
+    const now = Date.now()
+    const note: NoteDocument = {
+      id: crypto.randomUUID(),
+      title: 'Untitled note',
+      content: '',
+      createdAt: now,
+      updatedAt: now,
+      dirty: false,
+      draft: true
+    }
+    draftIds.current.add(note.id)
+    setNotes((current) => [note, ...current])
+    setActiveNoteId(note.id)
+    setActiveViewerId(null)
+    setTitleFocusKey((value) => value + 1)
+  }, [])
+
+  const updateNoteContent = useCallback((content: string) => {
+    if (!activeNoteId) return
+    const draft = draftIds.current.has(activeNoteId)
+    setNotes((current) =>
+      current.map((note) =>
+        note.id === activeNoteId && note.content !== content
+          ? { ...note, content, dirty: !draft, updatedAt: Date.now() }
+          : note
+      )
+    )
+    if (draft) return
+    const timer = saveTimers.current.get(activeNoteId)
+    if (timer) window.clearTimeout(timer)
+    const id = activeNoteId
+    saveTimers.current.set(
+      id,
+      window.setTimeout(() => {
+        void flushNote(id, content)
+      }, 400)
+    )
+  }, [activeNoteId, flushNote])
+
+  const saveActive = useCallback(async () => {
+    if (!activeNote) return
+    if (activeNote.draft) {
+      await persistDraft(activeNote.id)
+      return
+    }
+    await flushNote(activeNote.id, activeNote.content)
+  }, [activeNote, flushNote, persistDraft])
+
+  const renameNote = useCallback(async (id: string, title: string) => {
+    const current = notes.find((note) => note.id === id)
+    const nextTitle = title.trim().slice(0, 80) || 'Untitled note'
+    setRenamingId(null)
+    if (current?.draft || draftIds.current.has(id)) {
+      await persistDraft(id, nextTitle)
+      return
+    }
+    if (current && current.title === nextTitle) return
+    setNotes((currentNotes) =>
+      currentNotes.map((note) => (note.id === id ? { ...note, title: nextTitle } : note))
+    )
+    const result = await window.taskapp.renameNote(id, nextTitle)
+    if (!result.ok || !result.record) {
+      toast(result.error || 'Could not rename the note.', 'error')
+      if (current) {
+        setNotes((currentNotes) =>
+          currentNotes.map((note) => (note.id === id ? { ...note, title: current.title } : note))
+        )
+      }
+      return
+    }
+    setNotes((currentNotes) =>
+      currentNotes.map((note) =>
+        note.id === id ? { ...note, title: result.record!.title, updatedAt: result.record!.updatedAt } : note
+      )
+    )
+  }, [notes, persistDraft, toast])
+
+  const duplicateNote = useCallback(async (id: string) => {
+    const source = notes.find((note) => note.id === id)
+    if (!source) return
+    const created = await window.taskapp.createNote(source.content, copyTitle(source.title, notes))
+    const note: NoteDocument = { ...created.record, content: created.content, dirty: false }
+    setNotes((current) => [note, ...current])
+    setActiveNoteId(note.id)
+    setActiveViewerId(null)
+  }, [notes])
+
+  const showNoteFile = useCallback(async (id: string) => {
+    if (draftIds.current.has(id)) {
+      toast('Name the note first to create its file.')
+      return
+    }
+    const result = await window.taskapp.notePath(id)
+    if (!result.ok || !result.path) {
+      toast(result.error || 'Could not find that note.', 'error')
+      return
+    }
+    await window.taskapp.showInFolder(result.path)
+  }, [toast])
+
+  const changeFont = useCallback((delta: number) => {
+    const next = Math.min(22, Math.max(12, settings.fontSize + delta))
+    void persistSettings({ ...settings, fontSize: next })
+  }, [persistSettings, settings])
+
+  const requestDelete = useCallback((id: string) => {
+    setPendingDelete(id)
+  }, [])
+
+  const confirmDelete = useCallback(async () => {
+    if (!pendingDelete) return
+    const id = pendingDelete
+    const timer = saveTimers.current.get(id)
+    if (timer) {
+      window.clearTimeout(timer)
+      saveTimers.current.delete(id)
+    }
+    if (!draftIds.current.has(id)) {
+      await window.taskapp.deleteNote(id)
+    }
+    draftIds.current.delete(id)
+    setPendingDelete(null)
+    setNotes((current) => {
+      const next = current.filter((note) => note.id !== id)
+      if (activeNoteId === id) {
+        setActiveNoteId(next[0]?.id ?? null)
+      }
+      return next
+    })
+  }, [activeNoteId, pendingDelete])
+
+  const applyOpenResult = useCallback(async (result: OpenFileResult) => {
     if (!result.ok) {
       toast(result.error, 'error')
       return
     }
-    setDocs((current) => {
-      const existing = current.find((doc) => doc.path === result.path)
+
+    if (result.kind === 'text') {
+      const created = await window.taskapp.createNote(result.content, result.name.replace(/\.txt$/i, ''))
+      const note: NoteDocument = { ...created.record, content: created.content, dirty: false }
+      setNotes((current) => [note, ...current])
+      setActiveNoteId(note.id)
+      setActiveViewerId(null)
+      toast(`Saved “${note.title}” to your notes.`)
+      return
+    }
+
+    if (result.kind === 'json') {
+      setViewers((current) => {
+        const existing = current.find((doc) => doc.kind === 'json' && doc.path === result.path)
+        if (existing) {
+          setActiveViewerId(existing.id)
+          setActiveNoteId(null)
+          return current
+        }
+        const next: JsonViewerDoc = {
+          id: uid(),
+          kind: 'json',
+          path: result.path,
+          name: result.name,
+          mime: result.mime,
+          content: result.content
+        }
+        setActiveViewerId(next.id)
+        setActiveNoteId(null)
+        return [...current, next]
+      })
+      return
+    }
+
+    setViewers((current) => {
+      const existing = current.find((doc) => doc.kind === 'pdf' && doc.path === result.path)
       if (existing) {
-        setActiveId(existing.id)
+        setActiveViewerId(existing.id)
+        setActiveNoteId(null)
         return current
       }
-      const next = resultToDocument(result)
-      setActiveId(next.id)
+      const next: PdfViewerDoc = {
+        id: uid(),
+        kind: 'pdf',
+        path: result.path,
+        name: result.name,
+        mime: 'application/pdf',
+        pdfData: asBytes(result.data)
+      }
+      setActiveViewerId(next.id)
+      setActiveNoteId(null)
       return [...current, next]
     })
   }, [toast])
 
   const openPaths = useCallback(async (paths: string[]) => {
     for (const filePath of paths) {
-      applyOpenResult(await window.taskapp.openPath(filePath))
+      await applyOpenResult(await window.taskapp.openPath(filePath))
     }
-    const latest = await window.taskapp.getSettings()
-    setSettings(latest)
+    setSettings(await window.taskapp.getSettings())
   }, [applyOpenResult])
-
-  const newNote = useCallback(() => {
-    setDocs((current) => {
-      const name = untitledName(current)
-      const next: WorkspaceDocument = {
-        id: uid(),
-        path: null,
-        name,
-        mime: 'text/plain',
-        language: 'plaintext',
-        label: 'Plain Text',
-        kind: 'text',
-        content: '',
-        dirty: false,
-        cursor: { line: 1, column: 1 }
-      }
-      setActiveId(next.id)
-      return [...current, next]
-    })
-  }, [])
 
   const openFiles = useCallback(async () => {
     const dialog = await window.taskapp.openDialog()
     if (!dialog.canceled) await openPaths(dialog.paths)
   }, [openPaths])
 
-  const saveDocument = useCallback(async (doc: WorkspaceDocument, saveAs = false) => {
-    if (doc.kind === 'pdf') {
-      toast('PDFs open for reading only.')
-      return false
-    }
-    let target = doc.path
-    if (!target || saveAs) {
-      const picked = await window.taskapp.saveDialog(doc.name)
-      if (picked.canceled || !picked.path) return false
-      target = picked.path
-    }
-    const written = await window.taskapp.writeFile(target, doc.content)
-    if (!written.ok) {
-      toast(written.error || 'Could not save.', 'error')
-      return false
-    }
-    const type = inferFileType(target)
-    setDocs((current) =>
-      current.map((item) =>
-        item.id === doc.id
-          ? {
-              ...item,
-              path: target,
-              name: displayName(target!),
-              mime: type.mime,
-              language: type.kind === 'pdf' ? item.language : type.language,
-              label: type.label,
-              dirty: false
-            }
-          : item
-      )
-    )
-    const latest = await window.taskapp.getSettings()
-    setSettings(latest)
-    return true
-  }, [toast])
-
-  const requestClose = useCallback((id: string) => {
-    const doc = docs.find((item) => item.id === id)
-    if (doc?.dirty) {
-      setPendingClose(id)
-      return
-    }
-    setDocs((current) => {
-      const next = current.filter((item) => item.id !== id)
-      if (activeId === id) {
-        const index = current.findIndex((item) => item.id === id)
-        setActiveId(next[index]?.id ?? next[index - 1]?.id ?? null)
+  const closeViewer = useCallback((id: string) => {
+    setViewers((current) => {
+      const next = current.filter((doc) => doc.id !== id)
+      if (activeViewerId === id) {
+        setActiveViewerId(next.at(-1)?.id ?? null)
+        if (!next.length) {
+          setActiveNoteId((currentNote) => currentNote ?? notes[0]?.id ?? null)
+        }
       }
       return next
     })
-  }, [activeId, docs])
+  }, [activeViewerId, notes])
 
   const requestWindowClose = useCallback(() => {
-    if (docs.some((doc) => doc.dirty)) {
-      setPendingWindowClose(true)
-      return
-    }
-    window.taskapp.allowClose()
-  }, [docs])
-
-  const confirmWindowClose = useCallback(async (shouldSave: boolean) => {
-    if (shouldSave) {
-      for (const doc of docs.filter((item) => item.dirty && item.kind === 'text')) {
-        const saved = await saveDocument(doc)
-        if (!saved) return
-      }
-    }
-    setPendingWindowClose(false)
-    window.taskapp.allowClose()
-  }, [docs, saveDocument])
-
-  const confirmClose = useCallback(async (shouldSave: boolean) => {
-    if (!pendingClose) return
-    const doc = docs.find((item) => item.id === pendingClose)
-    if (shouldSave && doc) {
-      const saved = await saveDocument(doc)
-      if (!saved) return
-    }
-    const id = pendingClose
-    setPendingClose(null)
-    setDocs((current) => {
-      const next = current.filter((item) => item.id !== id)
-      if (activeId === id) {
-        const index = current.findIndex((item) => item.id === id)
-        setActiveId(next[index]?.id ?? next[index - 1]?.id ?? null)
-      }
-      return next
+    void flushAllDirty().then((ok) => {
+      if (ok) window.taskapp.allowClose()
     })
-  }, [activeId, docs, pendingClose, saveDocument])
-
-  const updateActiveContent = useCallback((content: string) => {
-    if (!activeId) return
-    setDocs((current) =>
-      current.map((item) =>
-        item.id === activeId && item.content !== content
-          ? { ...item, content, dirty: true }
-          : item
-      )
-    )
-  }, [activeId])
-
-  const updateCursor = useCallback((line: number, column: number) => {
-    if (!activeId) return
-    setDocs((current) =>
-      current.map((item) => (item.id === activeId ? { ...item, cursor: { line, column } } : item))
-    )
-  }, [activeId])
-
-  const setLanguage = useCallback((language: string) => {
-    if (!activeId) return
-    setDocs((current) =>
-      current.map((item) => (item.id === activeId ? { ...item, language } : item))
-    )
-  }, [activeId])
-
-  const applyJson = useCallback((mode: 'format' | 'minify' | 'validate') => {
-    if (!active || active.kind !== 'text') return
-    const check = inspectJson(active.content)
-    if (!check.ok) {
-      toast(check.message, 'error')
-      return
-    }
-    if (mode === 'validate') {
-      toast(check.message)
-      return
-    }
-    const next = mode === 'format' ? check.formatted : check.minified
-    if (next != null) updateActiveContent(next)
-  }, [active, toast, updateActiveContent])
+  }, [flushAllDirty])
 
   const handleMenu = useCallback((command: MenuCommand) => {
-    if (command === 'new') newNote()
+    if (command === 'new') void newNote()
     if (command === 'open') void openFiles()
-    if (command === 'save' && active) void saveDocument(active)
-    if (command === 'save-as' && active) void saveDocument(active, true)
-    if (command === 'close' && active) requestClose(active.id)
+    if (command === 'save') void saveActive()
+    if (command === 'close' && activeViewer) closeViewer(activeViewer.id)
+    if (command === 'rename' && activeNote) setTitleFocusKey((value) => value + 1)
+    if (command === 'duplicate' && activeNote) void duplicateNote(activeNote.id)
+    if (command === 'delete-note' && activeNote) requestDelete(activeNote.id)
+    if (command === 'undo') runNoteEdit('undo')
+    if (command === 'redo') runNoteEdit('redo')
+    if (command === 'cut') runNoteEdit('cut')
+    if (command === 'copy') runNoteEdit('copy')
+    if (command === 'paste') runNoteEdit('paste')
+    if (command === 'select-all') runNoteEdit('selectAll')
+    if (command === 'find') window.dispatchEvent(new CustomEvent('taskapp:find'))
     if (command === 'command-palette') setPaletteOpen(true)
     if (command === 'settings') setSettingsOpen(true)
     if (command === 'shortcuts') setShortcutsOpen(true)
     if (command === 'toggle-theme') {
-      void persistSettings({
-        ...settings,
-        theme: theme === 'ink' ? 'paper' : 'ink'
-      })
+      void persistSettings({ ...settings, theme: theme === 'ink' ? 'paper' : 'ink' })
     }
     if (command === 'toggle-wrap') {
       void persistSettings({ ...settings, wordWrap: !settings.wordWrap })
     }
-    if (command === 'format-json') applyJson('format')
-    if (command === 'minify-json') applyJson('minify')
-    if (command === 'validate-json') applyJson('validate')
-    if (command === 'show-in-folder' && active?.path) {
-      void window.taskapp.showInFolder(active.path)
+    if (command === 'font-larger') changeFont(1)
+    if (command === 'font-smaller') changeFont(-1)
+    if (command === 'show-in-folder' && activeViewer) {
+      void window.taskapp.showInFolder(activeViewer.path)
     }
-    if (command === 'find') {
-      window.dispatchEvent(new CustomEvent('taskapp:find'))
+    if (command === 'show-in-folder' && activeNote && !activeViewer) {
+      void showNoteFile(activeNote.id)
     }
-  }, [active, applyJson, newNote, openFiles, persistSettings, requestClose, saveDocument, settings, theme])
+    if (command === 'show-notes-folder') {
+      void window.taskapp.showNotesFolder()
+    }
+  }, [activeNote, activeViewer, changeFont, closeViewer, duplicateNote, newNote, openFiles, persistSettings, requestDelete, saveActive, settings, showNoteFile, theme])
 
   useEffect(() => {
     let cancelled = false
-    void window.taskapp.getSettings()
-      .then((loaded) => {
-        if (!cancelled) setSettings(loaded)
+    void Promise.all([window.taskapp.getSettings(), window.taskapp.listNotes()])
+      .then(([loadedSettings, library]) => {
+        if (cancelled) return
+        setSettings(loadedSettings)
+        setNotesDir(library.dir)
+        const loaded = library.notes.map((record) => ({
+          ...record,
+          content: library.contents[record.id] ?? '',
+          dirty: false
+        }))
+        setNotes(loaded)
+        setActiveNoteId(loaded[0]?.id ?? null)
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) toast(error instanceof Error ? error.message : 'Could not load notes.', 'error')
       })
       .finally(() => {
         if (!cancelled) setReady(true)
@@ -332,7 +449,7 @@ export function useWorkspace() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [toast])
 
   useEffect(() => {
     const offMenu = window.taskapp.onMenuCommand(handleMenu)
@@ -348,28 +465,40 @@ export function useWorkspace() {
   }, [handleMenu, openPaths, requestWindowClose])
 
   useEffect(() => {
-    const title = active ? `${active.dirty ? '• ' : ''}${active.name} — Taskapp` : 'Taskapp'
+    const title = activeViewer
+      ? `${activeViewer.name} — Taskapp`
+      : activeNote
+        ? `${activeNote.dirty ? '• ' : ''}${activeNote.title} — Taskapp`
+        : 'Taskapp'
     window.taskapp.setTitle(title)
-  }, [active])
+  }, [activeNote, activeViewer])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
   }, [theme])
 
   const jsonState = useMemo(() => {
-    if (!active || !isJsonLike(active.mime, active.language, active.name)) return null
-    return inspectJson(active.content)
-  }, [active])
+    if (activeViewer?.kind !== 'json') return null
+    return inspectJson(activeViewer.content)
+  }, [activeViewer])
 
   return {
     ready,
     settings,
     persistSettings,
     theme,
-    docs,
-    active,
-    activeId,
-    setActiveId,
+    notes,
+    notesDir,
+    viewers,
+    activeNote,
+    activeViewer,
+    activeNoteId,
+    activeViewerId,
+    selectNote,
+    setActiveViewerId: (id: string) => {
+      setActiveViewerId(id)
+      setActiveNoteId(null)
+    },
     toasts,
     paletteOpen,
     setPaletteOpen,
@@ -377,24 +506,23 @@ export function useWorkspace() {
     setSettingsOpen,
     shortcutsOpen,
     setShortcutsOpen,
-    pendingClose,
-    setPendingClose,
-    pendingWindowClose,
-    setPendingWindowClose,
-    requestWindowClose,
-    confirmWindowClose,
+    pendingDelete,
+    setPendingDelete,
+    renamingId,
+    setRenamingId,
+    titleFocusKey,
     jsonState,
-    toast,
     newNote,
     openFiles,
     openPaths,
-    saveDocument,
-    requestClose,
-    confirmClose,
-    updateActiveContent,
-    updateCursor,
-    setLanguage,
-    applyJson,
+    saveActive,
+    updateNoteContent,
+    renameNote,
+    duplicateNote,
+    showNoteFile,
+    requestDelete,
+    confirmDelete,
+    closeViewer,
     handleMenu
   }
 }

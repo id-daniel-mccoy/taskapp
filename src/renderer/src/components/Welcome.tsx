@@ -1,14 +1,14 @@
 import icon from '../assets/icon.png'
-import type { RecentFile } from '@shared/types'
+import type { NoteDocument } from '@shared/types'
 
 interface Props {
-  recents: RecentFile[]
+  notes: NoteDocument[]
   onNew: () => void
   onOpen: () => void
-  onOpenPath: (path: string) => void
+  onOpenNote: (id: string) => void
 }
 
-export function Welcome({ recents, onNew, onOpen, onOpenPath }: Props) {
+export function Welcome({ notes, onNew, onOpen, onOpenNote }: Props) {
   return (
     <div className="welcome">
       <div className="welcome-card">
@@ -16,26 +16,25 @@ export function Welcome({ recents, onNew, onOpen, onOpenPath }: Props) {
           <img src={icon} alt="Taskapp" />
           <div>
             <h1>Taskapp</h1>
-            <p>A quiet place for notes, JSON, and PDFs. Tasks and reminders come next.</p>
+            <p>Write notes as local .txt files. Open JSON and PDFs to read them — they are not notes.</p>
           </div>
         </div>
         <div className="welcome-actions">
           <button className="primary-btn" onClick={onNew}>New note</button>
-          <button className="ghost-btn" onClick={onOpen}>Open file</button>
+          <button className="ghost-btn" onClick={onOpen}>Open JSON or PDF</button>
         </div>
         <div className="recents">
-          <h2>Recent</h2>
-          {recents.length === 0 ? (
-            <p className="empty-note">Nothing here yet. Open a text file, JSON document, or PDF to begin.</p>
+          <h2>Notes on this computer</h2>
+          {notes.length === 0 ? (
+            <p className="empty-note">Nothing saved yet. Create a note and it will still be here after you quit.</p>
           ) : (
             <div className="recent-list">
-              {recents.map((item) => (
-                <button key={item.path} className="recent-item" onClick={() => onOpenPath(item.path)}>
+              {notes.map((note) => (
+                <button key={note.id} className="recent-item" onClick={() => onOpenNote(note.id)}>
                   <span>
-                    <strong>{item.name}</strong>
-                    <em>{item.path}</em>
+                    <strong>{note.title}</strong>
+                    <em>{new Date(note.updatedAt).toLocaleString()}</em>
                   </span>
-                  <em>{item.mime}</em>
                 </button>
               ))}
             </div>

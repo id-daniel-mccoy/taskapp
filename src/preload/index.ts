@@ -1,14 +1,26 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { AppSettings, MenuCommand, OpenFileResult, SaveDialogResult, WriteFileResult } from '../shared/types'
+import type {
+  AppSettings,
+  MenuCommand,
+  NoteRecord,
+  NotesLibrary,
+  OpenFileResult
+} from '../shared/types'
 
 export interface TaskappApi {
   getSettings: () => Promise<AppSettings>
   setSettings: (settings: AppSettings) => Promise<AppSettings>
   openDialog: () => Promise<{ canceled: boolean; paths: string[] }>
-  saveDialog: (suggestedName?: string) => Promise<SaveDialogResult>
   openPath: (filePath: string) => Promise<OpenFileResult>
-  writeFile: (filePath: string, content: string) => Promise<WriteFileResult>
+  listNotes: () => Promise<NotesLibrary>
+  createNote: (content?: string, title?: string, id?: string) => Promise<{ record: NoteRecord; content: string }>
+  writeNote: (id: string, content: string) => Promise<{ ok: boolean; record?: NoteRecord; error?: string }>
+  renameNote: (id: string, title: string) => Promise<{ ok: boolean; record?: NoteRecord; error?: string }>
+  notePath: (id: string) => Promise<{ ok: boolean; path?: string; error?: string }>
+  deleteNote: (id: string) => Promise<{ ok: boolean }>
+  notesDir: () => Promise<string>
   showInFolder: (filePath: string) => Promise<void>
+  showNotesFolder: () => Promise<void>
   minimize: () => void
   maximize: () => void
   close: () => void
@@ -24,10 +36,16 @@ const api: TaskappApi = {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (settings) => ipcRenderer.invoke('settings:set', settings),
   openDialog: () => ipcRenderer.invoke('dialog:open'),
-  saveDialog: (suggestedName) => ipcRenderer.invoke('dialog:save', suggestedName),
   openPath: (filePath) => ipcRenderer.invoke('fs:open', filePath),
-  writeFile: (filePath, content) => ipcRenderer.invoke('fs:write', filePath, content),
+  listNotes: () => ipcRenderer.invoke('notes:list'),
+  createNote: (content, title, id) => ipcRenderer.invoke('notes:create', content, title, id),
+  writeNote: (id, content) => ipcRenderer.invoke('notes:write', id, content),
+  renameNote: (id, title) => ipcRenderer.invoke('notes:rename', id, title),
+  notePath: (id) => ipcRenderer.invoke('notes:path', id),
+  deleteNote: (id) => ipcRenderer.invoke('notes:delete', id),
+  notesDir: () => ipcRenderer.invoke('notes:dir'),
   showInFolder: (filePath) => ipcRenderer.invoke('shell:show', filePath),
+  showNotesFolder: () => ipcRenderer.invoke('shell:showNotes'),
   minimize: () => ipcRenderer.send('window:min'),
   maximize: () => ipcRenderer.send('window:max'),
   close: () => ipcRenderer.send('window:close'),

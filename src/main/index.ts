@@ -1,9 +1,27 @@
 import { app, BrowserWindow, Menu, dialog, ipcMain, shell, nativeTheme } from 'electron'
-import { existsSync } from 'node:fs'
-import { readFile, writeFile, stat, open } from 'node:fs/promises'
-import { basename, join } from 'node:path'
+import { existsSync, statSync } from 'node:fs'
+import { mkdir, open, readFile, stat, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { DIALOG_FILTERS, displayName, inferFileType } from '../shared/mime'
 import type { AppSettings, MenuCommand, OpenFileResult, RecentFile } from '../shared/types'
+import { createNote, deleteNote, isPlainTextNote, loadLibrary, notePath, notesDir, renameNote, writeNote } from './notes'
+
+function linuxSandboxIsReady(): boolean {
+  const helper = join(process.resourcesPath || '', 'chrome-sandbox')
+  const unpacked = join(__dirname, '../../node_modules/electron/dist/chrome-sandbox')
+  const candidate = existsSync(unpacked) ? unpacked : helper
+  try {
+    const mode = statSync(candidate).mode
+    return (mode & 0o4000) !== 0 && (mode & 0o111) !== 0
+  } catch {
+    return false
+  }
+}
+
+if (process.platform === 'linux' && !linuxSandboxIsReady()) {
+  app.commandLine.appendSwitch('no-sandbox')
+}
+app.commandLine.appendSwitch('log-level', '3')
 
 const TEXT_LIMIT = 25 * 1024 * 1024
 const PDF_LIMIT = 80 * 1024 * 1024
@@ -98,7 +116,31 @@ async function openPath(filePath: string): Promise<OpenFileResult> {
       }
     }
 
-    if (type.kind === 'text' && (await looksBinary(filePath))) {
+    if (type.kind === 'json') {
+      if (info.size > TEXT_LIMIT) {
+        return { ok: false, error: 'This JSON file is larger than the 25 MB reading limit.' }
+      }
+      const content = await readFile(filePath, 'utf8')
+      return {
+        ok: true,
+        kind: 'json',
+        path: filePath,
+        name: displayName(filePath),
+        mime: type.mime,
+        language: 'json',
+        label: type.label,
+        content
+      }
+    }
+
+    if (type.kind !== 'text' || !isPlainTextNote(filePath, type.mime)) {
+      return {
+        ok: false,
+        error: 'Notes are plain .txt files. JSON and PDF files can be opened for reading.'
+      }
+    }
+
+    if (await looksBinary(filePath)) {
       return {
         ok: false,
         error: `${displayName(filePath)} appears to be binary and cannot be opened as text.`
@@ -115,9 +157,9 @@ async function openPath(filePath: string): Promise<OpenFileResult> {
       kind: 'text',
       path: filePath,
       name: displayName(filePath),
-      mime: type.mime,
-      language: type.language,
-      label: type.label,
+      mime: 'text/plain',
+      language: 'plaintext',
+      label: 'Plain Text',
       content
     }
   } catch (error) {
@@ -150,11 +192,11 @@ function buildMenu(): Menu {
             submenu: [
               { label: 'New note', accelerator: 'CmdOrCtrl+N', click: () => sendMenu('new') },
               { label: 'Open…', accelerator: 'CmdOrCtrl+O', click: () => sendMenu('open') },
-              { label: 'Save', accelerator: 'CmdOrCtrl+S', click: () => sendMenu('save') },
-              { label: 'Save as…', accelerator: 'CmdOrCtrl+Shift+S', click: () => sendMenu('save-as') },
-              { label: 'Close tab', accelerator: 'CmdOrCtrl+W', click: () => sendMenu('close') },
+              { label: 'Save note', accelerator: 'CmdOrCtrl+S', click: () => sendMenu('save') },
+              { label: 'Rename note', accelerator: 'F2', click: () => sendMenu('rename') },
+              { label: 'Close viewer', accelerator: 'CmdOrCtrl+W', click: () => sendMenu('close') },
               { type: 'separator' },
-              { label: 'Show in folder', click: () => sendMenu('show-in-folder') },
+              { label: 'Show notes folder', click: () => sendMenu('show-notes-folder') },
               { type: 'separator' },
               { role: 'quit' }
             ]
@@ -166,31 +208,28 @@ function buildMenu(): Menu {
         ? [
             { label: 'New note', accelerator: 'CmdOrCtrl+N', click: () => sendMenu('new') },
             { label: 'Open…', accelerator: 'CmdOrCtrl+O', click: () => sendMenu('open') },
-            { label: 'Save', accelerator: 'CmdOrCtrl+S', click: () => sendMenu('save') },
-            { label: 'Save as…', accelerator: 'CmdOrCtrl+Shift+S', click: () => sendMenu('save-as') },
-            { label: 'Close tab', accelerator: 'CmdOrCtrl+W', click: () => sendMenu('close') },
+            { label: 'Save note', accelerator: 'CmdOrCtrl+S', click: () => sendMenu('save') },
+            { label: 'Rename note', accelerator: 'F2', click: () => sendMenu('rename') },
+            { label: 'Close viewer', accelerator: 'CmdOrCtrl+W', click: () => sendMenu('close') },
             { type: 'separator' },
-            { label: 'Show in folder', click: () => sendMenu('show-in-folder') }
+            { label: 'Show notes folder', click: () => sendMenu('show-notes-folder') }
           ]
         : [
             { label: 'Command palette', accelerator: 'CmdOrCtrl+K', click: () => sendMenu('command-palette') },
-            { label: 'Find', accelerator: 'CmdOrCtrl+F', click: () => sendMenu('find') },
             { type: 'separator' },
-            { label: 'Format JSON', click: () => sendMenu('format-json') },
-            { label: 'Minify JSON', click: () => sendMenu('minify-json') },
-            { label: 'Validate JSON', click: () => sendMenu('validate-json') }
+            { label: 'Show notes folder', click: () => sendMenu('show-notes-folder') }
           ]
     },
     { role: 'editMenu' },
     {
       label: 'View',
       submenu: [
+        { label: 'Find', accelerator: 'CmdOrCtrl+F', click: () => sendMenu('find') },
         { label: 'Toggle theme', accelerator: 'CmdOrCtrl+Shift+T', click: () => sendMenu('toggle-theme') },
         { label: 'Word wrap', accelerator: 'Alt+Z', click: () => sendMenu('toggle-wrap') },
         { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
+        { label: 'Larger text', accelerator: 'CmdOrCtrl+=', click: () => sendMenu('font-larger') },
+        { label: 'Smaller text', accelerator: 'CmdOrCtrl+-', click: () => sendMenu('font-smaller') },
         { type: 'separator' },
         { role: 'togglefullscreen' }
       ]
@@ -224,7 +263,8 @@ function createWindow(): BrowserWindow {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: false,
+      spellcheck: true
     }
   })
 
@@ -288,24 +328,46 @@ function registerIpc(): void {
     return result
   })
 
-  ipcMain.handle('fs:write', async (_event, filePath: string, content: string) => {
+  ipcMain.handle('notes:list', () => loadLibrary())
+  ipcMain.handle('notes:create', async (_event, content?: string, title?: string, id?: string) => {
+    return createNote(content ?? '', title, id)
+  })
+  ipcMain.handle('notes:write', async (_event, id: string, content: string) => {
     try {
-      await writeFile(filePath, content, 'utf8')
-      const type = inferFileType(filePath)
-      await rememberRecent({
-        path: filePath,
-        name: basename(filePath),
-        mime: type.mime,
-        openedAt: Date.now()
-      })
-      return { ok: true }
+      const record = await writeNote(id, content)
+      return { ok: true, record }
     } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : 'Could not save the file.' }
+      return { ok: false, error: error instanceof Error ? error.message : 'Could not save the note.' }
     }
   })
+  ipcMain.handle('notes:rename', async (_event, id: string, title: string) => {
+    try {
+      const record = await renameNote(id, title)
+      return { ok: true, record }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Could not rename the note.' }
+    }
+  })
+  ipcMain.handle('notes:path', async (_event, id: string) => {
+    try {
+      return { ok: true, path: notePath(id) }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Could not find that note.' }
+    }
+  })
+  ipcMain.handle('notes:delete', async (_event, id: string) => {
+    await deleteNote(id)
+    return { ok: true }
+  })
+  ipcMain.handle('notes:dir', () => notesDir())
 
   ipcMain.handle('shell:show', async (_event, filePath: string) => {
     if (filePath) shell.showItemInFolder(filePath)
+  })
+  ipcMain.handle('shell:showNotes', async () => {
+    const dir = notesDir()
+    await mkdir(dir, { recursive: true })
+    shell.openPath(dir)
   })
 
   ipcMain.on('window:min', () => mainWindow?.minimize())
