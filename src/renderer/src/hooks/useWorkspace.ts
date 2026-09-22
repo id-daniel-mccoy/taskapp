@@ -3,12 +3,12 @@ import type {
   AppSettings,
   MenuCommand,
   NoteDocument,
-  OpenFileResult,
-  ThemePreference
+  OpenFileResult
 } from '@shared/types'
 import { inspectJson } from '../lib/json'
 import { runNoteEdit } from '../lib/edit'
 import { displayName, inferFileType } from '@shared/mime'
+import { nextTheme, normalizeTheme, themeFromCommand } from '@shared/themes'
 
 export interface JsonViewerDoc {
   id: string
@@ -39,6 +39,16 @@ export interface ImageViewerDoc {
   data: Uint8Array
 }
 
+export interface AudioViewerDoc {
+  id: string
+  kind: 'audio'
+  path: string
+  name: string
+  mime: string
+  label: string
+  data: Uint8Array
+}
+
 export interface TextFileViewerDoc {
   id: string
   kind: 'text-file'
@@ -50,7 +60,7 @@ export interface TextFileViewerDoc {
   dirty: boolean
 }
 
-export type ViewerDoc = JsonViewerDoc | PdfViewerDoc | ImageViewerDoc | TextFileViewerDoc
+export type ViewerDoc = JsonViewerDoc | PdfViewerDoc | ImageViewerDoc | AudioViewerDoc | TextFileViewerDoc
 export type EditableViewerDoc = JsonViewerDoc | TextFileViewerDoc
 
 function isEditableViewer(doc: ViewerDoc | null): doc is EditableViewerDoc {
@@ -68,8 +78,8 @@ function viewerAfterSave(id: string, filePath: string, content: string): Editabl
     kind: 'text-file',
     path: filePath,
     name,
-    mime: type.mime.startsWith('image/') || type.kind === 'pdf' ? 'text/plain' : type.mime,
-    label: type.kind === 'pdf' || type.kind === 'image' || type.kind === 'unsupported' ? 'Text' : type.label,
+    mime: type.mime.startsWith('image/') || type.kind === 'pdf' || type.kind === 'audio' ? 'text/plain' : type.mime,
+    label: type.kind === 'pdf' || type.kind === 'image' || type.kind === 'audio' || type.kind === 'unsupported' ? 'Text' : type.label,
     content,
     dirty: false
   }
@@ -82,7 +92,7 @@ interface Toast {
 }
 
 const emptySettings: AppSettings = {
-  theme: 'system',
+  theme: 'dark',
   wordWrap: true,
   fontSize: 16,
   recents: []
@@ -96,11 +106,6 @@ function asBytes(data: Uint8Array | ArrayBuffer | number[]): Uint8Array {
   if (data instanceof Uint8Array) return data
   if (data instanceof ArrayBuffer) return new Uint8Array(data)
   return Uint8Array.from(data)
-}
-
-function resolveTheme(preference: ThemePreference): 'ink' | 'paper' {
-  if (preference === 'ink' || preference === 'paper') return preference
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'ink' : 'paper'
 }
 
 function copyTitle(title: string, notes: NoteDocument[]): string {
@@ -131,7 +136,7 @@ export function useWorkspace() {
 
   const activeNote = notes.find((note) => note.id === activeNoteId) ?? null
   const activeViewer = viewers.find((doc) => doc.id === activeViewerId) ?? null
-  const theme = resolveTheme(settings.theme)
+  const theme = normalizeTheme(settings.theme)
 
   const toast = useCallback((text: string, tone: Toast['tone'] = 'info') => {
     const id = uid()
@@ -478,6 +483,30 @@ export function useWorkspace() {
       return
     }
 
+    if (result.kind === 'audio') {
+      setViewers((current) => {
+        const existing = current.find((doc) => doc.kind === 'audio' && doc.path === result.path)
+        if (existing) {
+          setActiveViewerId(existing.id)
+          setActiveNoteId(null)
+          return current
+        }
+        const next: AudioViewerDoc = {
+          id: uid(),
+          kind: 'audio',
+          path: result.path,
+          name: result.name,
+          mime: result.mime,
+          label: result.label,
+          data: asBytes(result.data)
+        }
+        setActiveViewerId(next.id)
+        setActiveNoteId(null)
+        return [...current, next]
+      })
+      return
+    }
+
     setViewers((current) => {
       const existing = current.find((doc) => doc.kind === 'pdf' && doc.path === result.path)
       if (existing) {
@@ -557,8 +586,10 @@ export function useWorkspace() {
     if (command === 'settings') setSettingsOpen(true)
     if (command === 'shortcuts') setShortcutsOpen(true)
     if (command === 'toggle-theme') {
-      void persistSettings({ ...settings, theme: theme === 'ink' ? 'paper' : 'ink' })
+      void persistSettings({ ...settings, theme: nextTheme(theme) })
     }
+    const chosen = themeFromCommand(command)
+    if (chosen) void persistSettings({ ...settings, theme: chosen })
     if (command === 'toggle-wrap') {
       void persistSettings({ ...settings, wordWrap: !settings.wordWrap })
     }
@@ -580,7 +611,7 @@ export function useWorkspace() {
     void Promise.all([window.taskapp.getSettings(), window.taskapp.listNotes()])
       .then(([loadedSettings, library]) => {
         if (cancelled) return
-        setSettings(loadedSettings)
+        setSettings({ ...loadedSettings, theme: normalizeTheme(loadedSettings.theme) })
         setNotesDir(library.dir)
         const loaded = library.notes.map((record) => ({
           ...record,

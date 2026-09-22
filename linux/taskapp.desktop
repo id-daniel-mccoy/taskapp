@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=Taskapp
 GenericName=Text Editor
-Comment=A notepad for notes, text files, JSON, PDFs, and images
+Comment=A notepad for notes, text files, JSON, PDFs, images, and audio
 Exec="@EXEC@" %F
 TryExec=@EXEC@
 Path=@ROOT@
@@ -10,6 +10,6 @@ Terminal=false
 Type=Application
 StartupNotify=true
 StartupWMClass=Taskapp
-Categories=Utility;TextEditor;Office;Viewer;
-MimeType=text/plain;text/markdown;text/html;text/css;text/javascript;text/xml;text/csv;text/calendar;text/x-python;text/x-sh;text/x-c;text/x-c++src;text/rust;text/x-go;text/x-java;application/json;application/xml;application/javascript;application/pdf;application/sql;application/x-sh;application/rtf;application/yaml;application/toml;image/png;image/jpeg;image/gif;image/webp;image/bmp;image/x-icon;image/vnd.microsoft.icon;image/svg+xml;image/avif;image/tiff;
-Keywords=notes;editor;json;pdf;notepad;markdown;image;png;
+Categories=Utility;TextEditor;Office;Viewer;AudioVideo;
+MimeType=text/plain;text/markdown;text/html;text/css;text/javascript;text/xml;text/csv;text/calendar;text/x-python;text/x-sh;text/x-c;text/x-c++src;text/rust;text/x-go;text/x-java;application/json;application/xml;application/javascript;application/pdf;application/sql;application/x-sh;application/rtf;application/yaml;application/toml;image/png;image/jpeg;image/gif;image/webp;image/bmp;image/x-icon;image/vnd.microsoft.icon;image/svg+xml;image/avif;image/tiff;audio/mpeg;audio/wav;audio/x-wav;audio/flac;audio/ogg;audio/opus;audio/mp4;audio/aac;audio/x-m4a;
+Keywords=notes;editor;json;pdf;notepad;markdown;image;png;audio;mp3;

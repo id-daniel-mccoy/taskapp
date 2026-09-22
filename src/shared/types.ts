@@ -1,6 +1,6 @@
-export type ThemePreference = 'ink' | 'paper' | 'system'
-export type FileKind = 'text' | 'text-file' | 'json' | 'pdf' | 'image' | 'unsupported'
-export type ViewerKind = 'json' | 'pdf' | 'image' | 'text-file'
+export type ThemePreference = 'light' | 'dark' | 'ocean-dream' | 'dark-forest' | 'purple-rain'
+export type FileKind = 'text' | 'text-file' | 'json' | 'pdf' | 'image' | 'audio' | 'unsupported'
+export type ViewerKind = 'json' | 'pdf' | 'image' | 'text-file' | 'audio'
 
 export interface FileTypeInfo {
   mime: string
@@ -21,6 +21,25 @@ export interface AppSettings {
   wordWrap: boolean
   fontSize: number
   recents: RecentFile[]
+}
+
+export interface Alarm {
+  id: string
+  enabled: boolean
+  hour: number
+  minute: number
+  label: string
+  days: number[]
+  soundPath: string
+  snoozeMinutes: number
+  createdAt: number
+  updatedAt: number
+}
+
+export interface AlarmSound {
+  path: string
+  name: string
+  theme: string
 }
 
 export interface NoteRecord {
@@ -91,12 +110,23 @@ export interface OpenImageResult {
   data: Uint8Array
 }
 
+export interface OpenAudioResult {
+  ok: true
+  kind: 'audio'
+  path: string
+  name: string
+  mime: string
+  language: 'audio'
+  label: string
+  data: Uint8Array
+}
+
 export interface OpenErrorResult {
   ok: false
   error: string
 }
 
-export type OpenFileResult = OpenTextResult | OpenJsonResult | OpenPdfResult | OpenTextFileResult | OpenImageResult | OpenErrorResult
+export type OpenFileResult = OpenTextResult | OpenJsonResult | OpenPdfResult | OpenTextFileResult | OpenImageResult | OpenAudioResult | OpenErrorResult
 
 export interface WriteFileResult {
   ok: boolean
@@ -127,6 +157,11 @@ export type MenuCommand =
   | 'find'
   | 'command-palette'
   | 'toggle-theme'
+  | 'theme-light'
+  | 'theme-dark'
+  | 'theme-ocean-dream'
+  | 'theme-dark-forest'
+  | 'theme-purple-rain'
   | 'toggle-wrap'
   | 'font-larger'
   | 'font-smaller'

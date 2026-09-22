@@ -16,7 +16,7 @@ export function Welcome({ notes, onNew, onOpen, onOpenNote }: Props) {
           <img src={icon} alt="Taskapp" />
           <div>
             <h1>Taskapp</h1>
-            <p>Write notes as local .txt files. Drop or open JSON, PDFs, images, and other text files — text files can be edited and saved in place, but they are not notes.</p>
+            <p>Write notes as local .txt files. Drop or open JSON, PDFs, images, audio, and other text files — text files can be edited and saved in place, but they are not notes.</p>
           </div>
         </div>
         <div className="welcome-actions">

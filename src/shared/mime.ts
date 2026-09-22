@@ -105,7 +105,16 @@ const byExt: Record<string, FileTypeInfo> = {
   ico: { mime: 'image/x-icon', language: 'image', kind: 'image', label: 'Icon' },
   avif: { mime: 'image/avif', language: 'image', kind: 'image', label: 'AVIF' },
   tif: { mime: 'image/tiff', language: 'image', kind: 'image', label: 'TIFF' },
-  tiff: { mime: 'image/tiff', language: 'image', kind: 'image', label: 'TIFF' }
+  tiff: { mime: 'image/tiff', language: 'image', kind: 'image', label: 'TIFF' },
+  mp3: { mime: 'audio/mpeg', language: 'audio', kind: 'audio', label: 'MP3' },
+  wav: { mime: 'audio/wav', language: 'audio', kind: 'audio', label: 'WAV' },
+  wave: { mime: 'audio/wav', language: 'audio', kind: 'audio', label: 'WAV' },
+  flac: { mime: 'audio/flac', language: 'audio', kind: 'audio', label: 'FLAC' },
+  ogg: { mime: 'audio/ogg', language: 'audio', kind: 'audio', label: 'Ogg' },
+  oga: { mime: 'audio/ogg', language: 'audio', kind: 'audio', label: 'Ogg' },
+  opus: { mime: 'audio/ogg', language: 'audio', kind: 'audio', label: 'Opus' },
+  m4a: { mime: 'audio/mp4', language: 'audio', kind: 'audio', label: 'AAC' },
+  aac: { mime: 'audio/aac', language: 'audio', kind: 'audio', label: 'AAC' }
 }
 
 const byMime: Record<string, FileTypeInfo> = {}
@@ -137,10 +146,22 @@ byMime['image/x-png'] = byExt.png
 byMime['image/x-icon'] = byExt.ico
 byMime['image/vnd.microsoft.icon'] = byExt.ico
 byMime['image/svg+xml'] = byExt.svg
+byMime['audio/mpeg'] = byExt.mp3
+byMime['audio/mp3'] = byExt.mp3
+byMime['audio/wav'] = byExt.wav
+byMime['audio/x-wav'] = byExt.wav
+byMime['audio/wave'] = byExt.wav
+byMime['audio/flac'] = byExt.flac
+byMime['audio/x-flac'] = byExt.flac
+byMime['audio/ogg'] = byExt.ogg
+byMime['audio/vorbis'] = byExt.ogg
+byMime['audio/opus'] = byExt.opus
+byMime['audio/mp4'] = byExt.m4a
+byMime['audio/x-m4a'] = byExt.m4a
+byMime['audio/aac'] = byExt.aac
 
 const BINARY_EXT = new Set([
   'heic', 'heif',
-  'mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac',
   'mp4', 'mov', 'mkv', 'webm', 'avi',
   'zip', 'tar', 'gz', 'bz2', 'xz', '7z', 'rar',
   'woff', 'woff2', 'ttf', 'otf', 'eot',
@@ -150,11 +171,12 @@ const BINARY_EXT = new Set([
 ])
 
 export const DIALOG_FILTERS = [
-  { name: 'Supported', extensions: ['txt', 'md', 'json', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'svg', 'avif'] },
+  { name: 'Supported', extensions: ['txt', 'md', 'json', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'svg', 'avif', 'mp3', 'wav', 'flac', 'ogg', 'oga', 'opus', 'm4a', 'aac'] },
   { name: 'Notes (Text)', extensions: ['txt'] },
   { name: 'JSON', extensions: ['json'] },
   { name: 'PDF', extensions: ['pdf'] },
   { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'svg', 'avif', 'tif', 'tiff'] },
+  { name: 'Audio', extensions: ['mp3', 'wav', 'flac', 'ogg', 'oga', 'opus', 'm4a', 'aac'] },
   { name: 'All files', extensions: ['*'] }
 ]
 
@@ -192,7 +214,16 @@ export const DESKTOP_MIME_TYPES = [
   'image/vnd.microsoft.icon',
   'image/svg+xml',
   'image/avif',
-  'image/tiff'
+  'image/tiff',
+  'audio/mpeg',
+  'audio/wav',
+  'audio/x-wav',
+  'audio/flac',
+  'audio/ogg',
+  'audio/opus',
+  'audio/mp4',
+  'audio/aac',
+  'audio/x-m4a'
 ]
 
 export function extensionOf(filePath: string): string {
@@ -218,6 +249,9 @@ export function inferFileType(filePath: string, mimeHint?: string): FileTypeInfo
     if (normalized === 'application/pdf') return byExt.pdf
     if (normalized.startsWith('image/')) {
       return byMime[normalized] ?? { mime: normalized, language: 'image', kind: 'image', label: 'Image' }
+    }
+    if (normalized.startsWith('audio/')) {
+      return byMime[normalized] ?? { mime: normalized, language: 'audio', kind: 'audio', label: 'Audio' }
     }
     if (normalized.startsWith('text/')) {
       return { mime: normalized, language: 'plaintext', kind: TEXT, label: 'Text' }

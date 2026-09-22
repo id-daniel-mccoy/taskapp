@@ -107,6 +107,7 @@ decode_file_url() {
 
 electron_flags=()
 file_args=()
+app_args=()
 if [[ "$(uname -s)" == "Linux" ]]; then
   SANDBOX="$ROOT/node_modules/electron/dist/chrome-sandbox"
   if [[ ! -u "$SANDBOX" ]]; then
@@ -115,7 +116,9 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 fi
 for value in "$@"; do
   value="$(decode_file_url "$value")"
-  if [[ -f "$value" ]]; then
+  if [[ "$value" == --alarm-ring=* || "$value" == --alarm-snooze=* || "$value" == --alarm-stop ]]; then
+    app_args+=("$value")
+  elif [[ -f "$value" ]]; then
     file_args+=("$(cd "$(dirname "$value")" && pwd)/$(basename "$value")")
   elif [[ -d "$value" ]]; then
     continue
@@ -155,12 +158,14 @@ taskapp_is_running() {
   return 1
 }
 
-port_3000_busy() {
+DEV_PORT=4718
+
+port_dev_busy() {
   if command -v ss >/dev/null 2>&1; then
-    ss -ltnH 'sport = :3000' 2>/dev/null | grep -q .
+    ss -ltnH "sport = :${DEV_PORT}" 2>/dev/null | grep -q .
     return
   fi
-  bash -c 'echo > /dev/tcp/127.0.0.1/3000' >/dev/null 2>&1
+  bash -c "echo > /dev/tcp/127.0.0.1/${DEV_PORT}" >/dev/null 2>&1
 }
 
 wait_for_running() {
@@ -175,15 +180,15 @@ wait_for_running() {
 }
 
 forward_to_running() {
-  # A second electron-vite would fail on port 3000. Hand the files to the
+  # A second electron-vite would fail on the renderer port. Hand the files to the
   # existing app via Electron's single-instance lock instead.
-  exec "$ELECTRON_BIN" "${electron_flags[@]}" "$ROOT" -- "${file_args[@]}"
+  exec "$ELECTRON_BIN" "${electron_flags[@]}" "$ROOT" -- "${file_args[@]}" "${app_args[@]}"
 }
 
 if taskapp_is_running; then
   forward_to_running
 fi
-if port_3000_busy; then
+if port_dev_busy; then
   if wait_for_running; then
     forward_to_running
   fi
@@ -191,4 +196,4 @@ if port_3000_busy; then
 fi
 
 # Chromium on Linux often prints a harmless GPU vsync warning; keep the rest of stderr intact.
-exec "$NODE_BIN" "$ELECTRON_JS" dev -- "${electron_flags[@]}" "${file_args[@]}" 2> >(grep -v --line-buffered 'GetVSyncParametersIfAvailable' >&2)
+exec "$NODE_BIN" "$ELECTRON_JS" dev -- "${electron_flags[@]}" "${file_args[@]}" "${app_args[@]}" 2> >(grep -v --line-buffered 'GetVSyncParametersIfAvailable' >&2)

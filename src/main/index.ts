@@ -1,9 +1,11 @@
-import { app, BrowserWindow, Menu, dialog, ipcMain, shell, nativeTheme } from 'electron'
+import { app, BrowserWindow, Menu, dialog, ipcMain, shell } from 'electron'
 import { existsSync, mkdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { mkdir, open, readFile, stat, writeFile } from 'node:fs/promises'
 import { isAbsolute, join, resolve } from 'node:path'
 import { DIALOG_FILTERS, displayName, inferFileType } from '../shared/mime'
-import type { AppSettings, MenuCommand, OpenFileResult, RecentFile } from '../shared/types'
+import { normalizeTheme, THEMES, themeWindowColor } from '../shared/themes'
+import type { Alarm, AppSettings, MenuCommand, OpenFileResult, RecentFile } from '../shared/types'
+import { createAlarm, deleteAlarm, disableOneShot, hasSystemdUser, invalidateAlarmCache, listAlarmSounds, listAlarms, parseAlarmArgs, previewSound, ringingAlarm, snoozeAlarm, stopPreview, stopRing, syncAllAlarms, updateAlarm } from './alarms'
 import { createNote, deleteNote, isPlainTextNote, loadLibrary, notePath, notesDir, renameNote, writeNote } from './notes'
 
 function linuxSandboxIsReady(): boolean {
@@ -26,10 +28,11 @@ app.commandLine.appendSwitch('log-level', '3')
 const TEXT_LIMIT = 25 * 1024 * 1024
 const PDF_LIMIT = 80 * 1024 * 1024
 const IMAGE_LIMIT = 40 * 1024 * 1024
+const AUDIO_LIMIT = 80 * 1024 * 1024
 const MAX_RECENTS = 16
 
 const defaultSettings: AppSettings = {
-  theme: 'system',
+  theme: 'dark',
   wordWrap: true,
   fontSize: 15,
   recents: []
@@ -51,7 +54,8 @@ async function loadSettings(): Promise<AppSettings> {
   if (settingsCache) return settingsCache
   try {
     const raw = await readFile(settingsPath(), 'utf8')
-    settingsCache = { ...defaultSettings, ...JSON.parse(raw) }
+    const parsed = JSON.parse(raw) as Partial<AppSettings>
+    settingsCache = { ...defaultSettings, ...parsed, theme: normalizeTheme(parsed.theme) }
   } catch {
     settingsCache = { ...defaultSettings }
   }
@@ -90,6 +94,7 @@ function collectOpenPaths(argv: string[] = process.argv, cwd = process.cwd()): s
 }
 
 let pendingOpen: string[] = []
+let pendingAlarm: Alarm | null = null
 let rendererReady = false
 
 function instancePidPath(): string {
@@ -127,6 +132,41 @@ function flushPendingOpen(): void {
   mainWindow.webContents.send('app:open-paths', paths)
 }
 
+function sendAlarmRing(alarm: Alarm): void {
+  pendingAlarm = alarm
+  if (!rendererReady || !mainWindow || mainWindow.isDestroyed()) return
+  mainWindow.webContents.send('alarm:ring', alarm)
+}
+
+function sendAlarmStopped(): void {
+  pendingAlarm = null
+  if (!rendererReady || !mainWindow || mainWindow.isDestroyed()) return
+  mainWindow.webContents.send('alarm:stopped')
+}
+
+async function handleAlarmCommands(argv: string[]): Promise<void> {
+  const commands = parseAlarmArgs(argv)
+  for (const command of commands) {
+    if (command.action === 'stop') {
+      await stopRing()
+      sendAlarmStopped()
+      continue
+    }
+    if (!command.id) continue
+    if (command.action === 'snooze') {
+      await snoozeAlarm(command.id)
+      sendAlarmStopped()
+      continue
+    }
+    invalidateAlarmCache()
+    stopPreview()
+    const alarm = (await disableOneShot(command.id)) ?? (await listAlarms()).find((item) => item.id === command.id)
+    if (!alarm) continue
+    sendAlarmRing(alarm)
+    focusMainWindow()
+  }
+}
+
 function focusMainWindow(): void {
   const win = mainWindow
   if (!win || win.isDestroyed()) return
@@ -160,7 +200,7 @@ async function openPath(filePath: string): Promise<OpenFileResult> {
     if (type.kind === 'unsupported') {
       return {
         ok: false,
-        error: `${displayName(filePath)} is not a supported note, text, PDF, or image file.`
+        error: `${displayName(filePath)} is not a supported note, text, PDF, image, or audio file.`
       }
     }
 
@@ -176,6 +216,23 @@ async function openPath(filePath: string): Promise<OpenFileResult> {
         name: displayName(filePath),
         mime: type.mime,
         language: 'image',
+        label: type.label,
+        data: new Uint8Array(data)
+      }
+    }
+
+    if (type.kind === 'audio') {
+      if (info.size > AUDIO_LIMIT) {
+        return { ok: false, error: 'This audio file is larger than the 80 MB playback limit.' }
+      }
+      const data = await readFile(filePath)
+      return {
+        ok: true,
+        kind: 'audio',
+        path: filePath,
+        name: displayName(filePath),
+        mime: type.mime,
+        language: 'audio',
         label: type.label,
         data: new Uint8Array(data)
       }
@@ -218,7 +275,7 @@ async function openPath(filePath: string): Promise<OpenFileResult> {
     if (type.kind !== 'text') {
       return {
         ok: false,
-        error: 'That file type cannot be opened. Drop a note, text file, JSON, PDF, or image.'
+        error: 'That file type cannot be opened. Drop a note, text file, JSON, PDF, image, or audio file.'
       }
     }
 
@@ -277,75 +334,111 @@ function sendMenu(command: MenuCommand): void {
 }
 
 function buildMenu(): Menu {
-  const isMac = process.platform === 'darwin'
   return Menu.buildFromTemplate([
-    ...(isMac
-      ? [{ role: 'appMenu' as const }]
-      : [
-          {
-            label: 'File',
-            submenu: [
-              { label: 'New note', accelerator: 'CmdOrCtrl+N', click: () => sendMenu('new') },
-              { label: 'Open…', accelerator: 'CmdOrCtrl+O', click: () => sendMenu('open') },
-              { label: 'Save', accelerator: 'CmdOrCtrl+S', click: () => sendMenu('save') },
-              { label: 'Save as…', accelerator: 'CmdOrCtrl+Shift+S', click: () => sendMenu('save-as') },
-              { label: 'Rename note', accelerator: 'F2', click: () => sendMenu('rename') },
-              { label: 'Close viewer', accelerator: 'CmdOrCtrl+W', click: () => sendMenu('close') },
-              { type: 'separator' },
-              { label: 'Show notes folder', click: () => sendMenu('show-notes-folder') },
-              { type: 'separator' },
-              { role: 'quit' }
-            ]
-          }
-        ]),
+    ...(process.platform === 'darwin' ? [{ role: 'appMenu' as const }] : []),
     {
-      label: isMac ? 'File' : 'Note',
-      submenu: isMac
-        ? [
-            { label: 'New note', accelerator: 'CmdOrCtrl+N', click: () => sendMenu('new') },
-            { label: 'Open…', accelerator: 'CmdOrCtrl+O', click: () => sendMenu('open') },
-            { label: 'Save', accelerator: 'CmdOrCtrl+S', click: () => sendMenu('save') },
-            { label: 'Save as…', accelerator: 'CmdOrCtrl+Shift+S', click: () => sendMenu('save-as') },
-            { label: 'Rename note', accelerator: 'F2', click: () => sendMenu('rename') },
-            { label: 'Close viewer', accelerator: 'CmdOrCtrl+W', click: () => sendMenu('close') },
-            { type: 'separator' },
-            { label: 'Show notes folder', click: () => sendMenu('show-notes-folder') }
-          ]
-        : [
-            { label: 'Command palette', accelerator: 'CmdOrCtrl+K', click: () => sendMenu('command-palette') },
-            { type: 'separator' },
-            { label: 'Show notes folder', click: () => sendMenu('show-notes-folder') }
-          ]
+      label: 'File',
+      submenu: [
+        { label: 'New note', accelerator: 'CmdOrCtrl+N', click: () => sendMenu('new') },
+        { label: 'Open…', accelerator: 'CmdOrCtrl+O', click: () => sendMenu('open') },
+        { label: 'Save', accelerator: 'CmdOrCtrl+S', click: () => sendMenu('save') },
+        { label: 'Save as…', accelerator: 'CmdOrCtrl+Shift+S', click: () => sendMenu('save-as') },
+        { type: 'separator' },
+        { label: 'Rename note', accelerator: 'F2', click: () => sendMenu('rename') },
+        { label: 'Duplicate note', click: () => sendMenu('duplicate') },
+        { label: 'Delete note', click: () => sendMenu('delete-note') },
+        { label: 'Close viewer', accelerator: 'CmdOrCtrl+W', click: () => sendMenu('close') },
+        { type: 'separator' },
+        { label: 'Show in folder', click: () => sendMenu('show-in-folder') },
+        { label: 'Show notes folder', click: () => sendMenu('show-notes-folder') },
+        { type: 'separator' },
+        { label: 'Settings', accelerator: 'CmdOrCtrl+,', click: () => sendMenu('settings') },
+        { type: 'separator' },
+        { label: 'Quit', accelerator: 'CmdOrCtrl+Q', click: () => mainWindow?.close() }
+      ]
     },
-    { role: 'editMenu' },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+        { type: 'separator' },
+        { label: 'Find', accelerator: 'CmdOrCtrl+F', click: () => sendMenu('find') }
+      ]
+    },
     {
       label: 'View',
       submenu: [
-        { label: 'Find', accelerator: 'CmdOrCtrl+F', click: () => sendMenu('find') },
-        { label: 'Toggle theme', accelerator: 'CmdOrCtrl+Shift+T', click: () => sendMenu('toggle-theme') },
+        { label: 'Command palette', accelerator: 'CmdOrCtrl+K', click: () => sendMenu('command-palette') },
+        { type: 'separator' },
+        {
+          label: 'Theme',
+          submenu: THEMES.map((item) => ({
+            label: item.label,
+            click: () => sendMenu(item.command)
+          }))
+        },
+        { label: 'Next theme', accelerator: 'CmdOrCtrl+Shift+T', click: () => sendMenu('toggle-theme') },
         { label: 'Word wrap', accelerator: 'Alt+Z', click: () => sendMenu('toggle-wrap') },
         { type: 'separator' },
         { label: 'Larger text', accelerator: 'CmdOrCtrl+=', click: () => sendMenu('font-larger') },
         { label: 'Smaller text', accelerator: 'CmdOrCtrl+-', click: () => sendMenu('font-smaller') },
         { type: 'separator' },
-        { role: 'togglefullscreen' }
+        { label: 'Keyboard shortcuts', accelerator: 'CmdOrCtrl+/', click: () => sendMenu('shortcuts') }
       ]
-    },
-    {
-      label: 'Window',
-      submenu: [{ role: 'minimize' }, { role: 'close' }]
     },
     {
       label: 'Help',
-      submenu: [
-        { label: 'Keyboard shortcuts', accelerator: 'CmdOrCtrl+/', click: () => sendMenu('shortcuts') },
-        { label: 'Settings', accelerator: 'CmdOrCtrl+,', click: () => sendMenu('settings') }
-      ]
+      submenu: [{ label: 'Coming Soon...', enabled: false }]
     }
   ])
 }
 
+function attachEditorContextMenu(win: BrowserWindow): void {
+  win.webContents.on('context-menu', (_event, params) => {
+    if (!params.isEditable && !params.selectionText.trim()) return
+
+    const items: Electron.MenuItemConstructorOptions[] = []
+    if (params.isEditable) {
+      for (const suggestion of params.dictionarySuggestions.slice(0, 5)) {
+        items.push({
+          label: suggestion,
+          click: () => win.webContents.replaceMisspelling(suggestion)
+        })
+      }
+      if (params.misspelledWord) {
+        items.push({
+          label: 'Add to dictionary',
+          click: () => win.webContents.session.addWordToSpellCheckerDictionary(params.misspelledWord)
+        })
+      }
+      if (items.length) items.push({ type: 'separator' })
+      items.push(
+        { role: 'undo', enabled: params.editFlags.canUndo },
+        { role: 'redo', enabled: params.editFlags.canRedo },
+        { type: 'separator' },
+        { role: 'cut', enabled: params.editFlags.canCut },
+        { role: 'copy', enabled: params.editFlags.canCopy },
+        { role: 'paste', enabled: params.editFlags.canPaste },
+        { role: 'selectAll', enabled: params.editFlags.canSelectAll },
+        { type: 'separator' },
+        { label: 'Find', accelerator: 'CmdOrCtrl+F', click: () => sendMenu('find') }
+      )
+    } else {
+      items.push({ role: 'copy' })
+    }
+
+    Menu.buildFromTemplate(items).popup({ window: win })
+  })
+}
+
 function createWindow(): BrowserWindow {
+  const background = themeWindowColor(normalizeTheme(settingsCache?.theme))
   const win = new BrowserWindow({
     width: 1320,
     height: 860,
@@ -353,7 +446,8 @@ function createWindow(): BrowserWindow {
     minHeight: 560,
     show: false,
     frame: false,
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0e1318' : '#f3eee4',
+    autoHideMenuBar: true,
+    backgroundColor: background,
     icon: iconPath(),
     title: 'Taskapp',
     webPreferences: {
@@ -371,6 +465,8 @@ function createWindow(): BrowserWindow {
     win.webContents.send('app:close-requested')
   })
   win.on('ready-to-show', () => win.show())
+  win.setMenuBarVisibility(false)
+  attachEditorContextMenu(win)
   win.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
@@ -395,8 +491,9 @@ function registerIpc(): void {
 
   ipcMain.handle('settings:get', () => loadSettings())
   ipcMain.handle('settings:set', async (_event, next: AppSettings) => {
-    await saveSettings(next)
-    return next
+    const normalized = { ...next, theme: normalizeTheme(next.theme) }
+    await saveSettings(normalized)
+    return normalized
   })
 
   ipcMain.handle('dialog:open', async () => {
@@ -481,6 +578,54 @@ function registerIpc(): void {
   })
   ipcMain.handle('notes:dir', () => notesDir())
 
+  ipcMain.handle('alarms:list', () => listAlarms())
+  ipcMain.handle('alarms:create', async (_event, input?: Partial<Alarm>) => {
+    try {
+      const alarm = await createAlarm(input)
+      return { ok: true, alarm, systemd: await hasSystemdUser() }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Could not create the alarm.' }
+    }
+  })
+  ipcMain.handle('alarms:update', async (_event, id: string, patch: Partial<Alarm>) => {
+    try {
+      const alarm = await updateAlarm(id, patch)
+      return { ok: true, alarm, systemd: await hasSystemdUser() }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Could not update the alarm.' }
+    }
+  })
+  ipcMain.handle('alarms:delete', async (_event, id: string) => {
+    try {
+      await deleteAlarm(id)
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Could not delete the alarm.' }
+    }
+  })
+  ipcMain.handle('alarms:sounds', () => listAlarmSounds())
+  ipcMain.handle('alarms:preview', (_event, filePath: string) => previewSound(filePath))
+  ipcMain.handle('alarms:stop-preview', () => {
+    stopPreview()
+    return { ok: true }
+  })
+  ipcMain.handle('alarms:ringing', async () => pendingAlarm ?? (await ringingAlarm()))
+  ipcMain.handle('alarms:systemd', () => hasSystemdUser())
+  ipcMain.handle('alarms:stop', async () => {
+    await stopRing()
+    sendAlarmStopped()
+    return { ok: true }
+  })
+  ipcMain.handle('alarms:snooze', async (_event, id: string) => {
+    try {
+      await snoozeAlarm(id)
+      sendAlarmStopped()
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Could not snooze the alarm.' }
+    }
+  })
+
   ipcMain.handle('shell:show', async (_event, filePath: string) => {
     if (filePath) shell.showItemInFolder(filePath)
   })
@@ -515,14 +660,20 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('second-instance', (_event, argv, cwd) => {
     enqueueOpen(collectOpenPaths(argv, cwd))
+    void handleAlarmCommands(argv)
     focusMainWindow()
   })
 
   app.whenReady().then(async () => {
+    await loadSettings()
     registerIpc()
     Menu.setApplicationMenu(buildMenu())
     mainWindow = createWindow()
     enqueueOpen(collectOpenPaths())
+    await handleAlarmCommands(process.argv)
+    const alreadyRinging = await ringingAlarm()
+    if (alreadyRinging) sendAlarmRing(alreadyRinging)
+    void syncAllAlarms()
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
@@ -544,4 +695,5 @@ app.on('open-file', (event, filePath) => {
 
 app.on('quit', () => {
   clearInstancePid()
+  stopPreview()
 })

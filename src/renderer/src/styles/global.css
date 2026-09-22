@@ -9,14 +9,16 @@
   --text: #ebe6dc;
   --muted: #9aa3ad;
   --faint: #6d7680;
-  --accent: #d4a05a;
-  --accent-soft: rgba(212, 160, 90, 0.16);
-  --ok: #7dba8a;
-  --ok-soft: rgba(125, 186, 138, 0.16);
-  --danger: #d4676a;
-  --danger-soft: rgba(212, 103, 106, 0.16);
+  --accent: #e2ac4a;
+  --accent-soft: rgba(226, 172, 74, 0.2);
+  --on-accent: #1a140c;
+  --ok: #7fc992;
+  --ok-soft: rgba(127, 201, 146, 0.18);
+  --danger: #e07074;
+  --danger-soft: rgba(224, 112, 116, 0.18);
+  --wash: rgba(226, 172, 74, 0.12);
   --shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
-  --titlebar: 48px;
+  --titlebar: 72px;
   --rail: 64px;
   --sidebar: 252px;
   --status: 28px;
@@ -26,24 +28,92 @@
   --font-mono: "IBM Plex Mono", "Ubuntu Mono", "Noto Sans Mono", ui-monospace, monospace;
 }
 
-:root[data-theme='paper'] {
+:root[data-theme='light'] {
   color-scheme: light;
-  --bg: #efe8db;
-  --surface: #f7f1e6;
-  --raised: #fffdf8;
-  --well: #fbf7f0;
-  --border: #d8ccb8;
-  --hairline: rgba(42, 36, 28, 0.08);
-  --text: #2a241c;
-  --muted: #6f6658;
-  --faint: #94897a;
-  --accent: #9a6b2f;
-  --accent-soft: rgba(154, 107, 47, 0.12);
-  --ok: #3d7a4c;
-  --ok-soft: rgba(61, 122, 76, 0.12);
-  --danger: #b5443a;
-  --danger-soft: rgba(181, 68, 58, 0.12);
-  --shadow: 0 18px 40px rgba(72, 52, 28, 0.12);
+  --bg: #f3f5f7;
+  --surface: #fafbfc;
+  --raised: #ffffff;
+  --well: #eef1f4;
+  --border: #d0dae4;
+  --hairline: rgba(28, 36, 44, 0.08);
+  --text: #1a2128;
+  --muted: #547089;
+  --faint: #8094a4;
+  --accent: #2f86b3;
+  --accent-soft: rgba(47, 134, 179, 0.14);
+  --on-accent: #ffffff;
+  --ok: #2f8f4e;
+  --ok-soft: rgba(47, 143, 78, 0.14);
+  --danger: #c2473c;
+  --danger-soft: rgba(194, 71, 60, 0.14);
+  --wash: rgba(47, 134, 179, 0.12);
+  --shadow: 0 18px 40px rgba(28, 40, 52, 0.08);
+}
+
+:root[data-theme='ocean-dream'] {
+  color-scheme: light;
+  --bg: #e4f6f8;
+  --surface: #f2fcfd;
+  --raised: #ffffff;
+  --well: #d5f0f4;
+  --border: #a8d5de;
+  --hairline: rgba(22, 64, 74, 0.08);
+  --text: #143841;
+  --muted: #3d8494;
+  --faint: #6ea8b3;
+  --accent: #0ea3b8;
+  --accent-soft: rgba(14, 163, 184, 0.16);
+  --on-accent: #ffffff;
+  --ok: #1c9d78;
+  --ok-soft: rgba(28, 157, 120, 0.16);
+  --danger: #d05656;
+  --danger-soft: rgba(208, 86, 86, 0.16);
+  --wash: rgba(32, 188, 210, 0.22);
+  --shadow: 0 18px 40px rgba(28, 92, 104, 0.12);
+}
+
+:root[data-theme='dark-forest'] {
+  color-scheme: dark;
+  --bg: #121a14;
+  --surface: #18241c;
+  --raised: #1e2d23;
+  --well: #101810;
+  --border: #314c38;
+  --hairline: rgba(210, 224, 198, 0.08);
+  --text: #e3f0d4;
+  --muted: #8fb88a;
+  --faint: #6b8a6c;
+  --accent: #8fd45a;
+  --accent-soft: rgba(143, 212, 90, 0.18);
+  --on-accent: #121a14;
+  --ok: #8fd45a;
+  --ok-soft: rgba(143, 212, 90, 0.18);
+  --danger: #e07d68;
+  --danger-soft: rgba(224, 125, 104, 0.18);
+  --wash: rgba(125, 196, 72, 0.16);
+  --shadow: 0 18px 48px rgba(0, 0, 0, 0.38);
+}
+
+:root[data-theme='purple-rain'] {
+  color-scheme: dark;
+  --bg: #16121c;
+  --surface: #1e1828;
+  --raised: #271f34;
+  --well: #120e18;
+  --border: #433056;
+  --hairline: rgba(236, 224, 246, 0.08);
+  --text: #f3e9fb;
+  --muted: #c29ee0;
+  --faint: #8b74a8;
+  --accent: #d48ef2;
+  --accent-soft: rgba(212, 142, 242, 0.2);
+  --on-accent: #1a1224;
+  --ok: #7ed9bc;
+  --ok-soft: rgba(126, 217, 188, 0.18);
+  --danger: #e86e96;
+  --danger-soft: rgba(232, 110, 150, 0.18);
+  --wash: rgba(186, 112, 232, 0.2);
+  --shadow: 0 18px 48px rgba(12, 6, 20, 0.42);
 }
 
 * {
@@ -82,22 +152,30 @@ button {
 
 .app {
   height: 100%;
+  position: relative;
   display: grid;
   grid-template-rows: var(--titlebar) 1fr var(--status);
   background:
-    radial-gradient(1200px 480px at 10% -10%, rgba(212, 160, 90, 0.08), transparent 50%),
+    radial-gradient(1200px 480px at 10% -10%, var(--wash), transparent 50%),
     var(--bg);
 }
 
 .titlebar {
-  display: grid;
-  grid-template-columns: var(--rail) 1fr auto;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
   z-index: 6;
   overflow: visible;
   -webkit-app-region: drag;
   border-bottom: 1px solid var(--hairline);
   background: color-mix(in srgb, var(--surface) 88%, transparent);
+}
+
+.titlebar-main {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  align-items: center;
+  height: 40px;
+  min-height: 40px;
 }
 
 .titlebar-brand,
@@ -106,7 +184,8 @@ button {
 .titlebar-center,
 .titlebar button,
 .titlebar input,
-.titlebar select {
+.titlebar select,
+.app-menubar {
   -webkit-app-region: no-drag;
 }
 
@@ -118,8 +197,8 @@ button {
 }
 
 .titlebar-brand img {
-  width: 36px;
-  height: 36px;
+  width: 22px;
+  height: 22px;
   border-radius: 0;
 }
 
@@ -230,6 +309,115 @@ button {
 .window-btn.close:hover {
   background: var(--danger);
   color: white;
+}
+
+.app-menubar {
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  padding: 0 4px;
+  border-top: 1px solid var(--hairline);
+}
+
+.app-menu {
+  position: relative;
+}
+
+.app-menu-trigger {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 10px;
+  border-radius: 0;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.app-menu.open .app-menu-trigger,
+.app-menu-trigger:hover {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.app-menu-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 30;
+  min-width: 248px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--raised);
+  box-shadow: var(--shadow);
+}
+
+.app-menu-dropdown button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  text-align: left;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.app-menu-dropdown button:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.app-menu-dropdown button:disabled {
+  color: var(--faint);
+  cursor: default;
+}
+
+.app-menu-dropdown button.danger {
+  color: var(--danger);
+}
+
+.app-menu-dropdown kbd {
+  color: var(--faint);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.app-menu-dropdown hr {
+  border: 0;
+  border-top: 1px solid var(--hairline);
+  margin: 4px 0;
+}
+
+.app-menu-sub {
+  position: relative;
+}
+
+.app-menu-sub-trigger {
+  gap: 16px;
+}
+
+.app-menu-sub-trigger svg {
+  color: var(--faint);
+}
+
+.app-menu-flyout {
+  top: -6px;
+  left: calc(100% + 4px);
+}
+
+.app-menu-check {
+  width: 1em;
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.app-menu-dropdown button.has-check {
+  justify-content: flex-start;
+  gap: 10px;
 }
 
 .shell {
@@ -548,9 +736,7 @@ button {
 .file-viewer-body {
   display: block;
   width: 100%;
-  flex: 1;
   min-height: 0;
-  height: auto;
   border: 0;
   resize: none;
   outline: none;
@@ -565,6 +751,11 @@ button {
   pointer-events: auto;
   user-select: text;
   -webkit-app-region: no-drag;
+}
+
+.note-editor {
+  flex: 1 1 0;
+  height: 0;
 }
 
 .note-editor::placeholder {
@@ -616,6 +807,7 @@ button {
 }
 
 .tabbar {
+  grid-row: 1;
   display: flex;
   align-items: stretch;
   overflow: auto hidden;
@@ -673,6 +865,7 @@ button {
 }
 
 .stage {
+  grid-row: 2;
   min-height: 0;
   position: relative;
   background: var(--well);
@@ -681,6 +874,7 @@ button {
 .editor-host,
 .pdf-host,
 .image-host,
+.audio-host,
 .welcome,
 .overlay {
   position: absolute;
@@ -790,7 +984,7 @@ button {
 
 .primary-btn {
   background: var(--accent);
-  color: #1a140c;
+  color: var(--on-accent);
 }
 
 .ghost-btn {
@@ -838,7 +1032,8 @@ button {
 }
 
 .pdf-host,
-.image-host {
+.image-host,
+.audio-host {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
@@ -957,6 +1152,71 @@ button.pdf-page-num.on {
   max-height: calc(100vh - 180px);
   width: auto;
   object-fit: contain;
+}
+
+.audio-stage {
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 32px 24px;
+}
+
+.audio-card {
+  width: min(560px, 100%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 20px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--raised);
+}
+
+.audio-play {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.audio-play:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.audio-timeline {
+  flex: 1;
+  min-width: 0;
+}
+
+.audio-timeline input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.audio-times {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  color: var(--faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.audio-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.audio-host audio {
+  display: none;
 }
 
 .status {
@@ -1106,4 +1366,414 @@ button.pdf-page-num.on {
 .empty-note {
   color: var(--faint);
   font-size: 13px;
+}
+
+.alarm-item {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  padding-right: 8px;
+}
+
+.alarm-item.is-off .alarm-item-main strong,
+.alarm-item.is-off .alarm-item-main em {
+  color: var(--faint);
+}
+
+.alarm-item-main strong {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.alarm-item-main em span {
+  color: var(--faint);
+}
+
+.alarm-next {
+  display: block;
+  margin-top: 4px;
+  color: var(--accent);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.alarm-item.is-off .alarm-next {
+  display: none;
+}
+
+.alarm-switch {
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--border);
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.alarm-switch span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--raised);
+  transition: transform 0.16s ease;
+}
+
+.alarm-switch.on {
+  background: var(--accent);
+}
+
+.alarm-switch.on span {
+  transform: translateX(18px);
+}
+
+.alarm-stage {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: 24px 36px 48px;
+}
+
+.alarm-empty {
+  max-width: 420px;
+  margin: 8vh auto 0;
+  text-align: center;
+}
+
+.alarm-empty h1,
+.alarm-hero-caption,
+.alarm-ring-card h1,
+.alarm-time-pair strong,
+.alarm-colon,
+.alarm-clock-num,
+.alarm-name input {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+.alarm-empty h1 {
+  margin: 0 0 8px;
+  font-size: 32px;
+}
+
+.alarm-empty p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.alarm-editor {
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.alarm-hero {
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  margin-bottom: 8px;
+  padding-bottom: 22px;
+}
+
+.alarm-clock {
+  width: 268px;
+  color: var(--accent);
+  filter: drop-shadow(0 16px 36px color-mix(in srgb, var(--accent) 22%, transparent));
+}
+
+.alarm-clock.is-idle {
+  width: 176px;
+  margin: 0 auto 28px;
+  opacity: 0.88;
+  filter: drop-shadow(0 10px 24px color-mix(in srgb, var(--accent) 16%, transparent));
+}
+
+.alarm-clock.is-ringing {
+  width: 168px;
+  margin: 0 auto 18px;
+}
+
+.alarm-clock-face {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.alarm-clock-rim {
+  fill: var(--raised);
+  stroke: color-mix(in srgb, var(--accent) 42%, var(--border));
+  stroke-width: 1.25;
+}
+
+.alarm-clock-track {
+  fill: none;
+  stroke: color-mix(in srgb, var(--accent) 18%, var(--border));
+  stroke-width: 2.5;
+}
+
+.alarm-clock-arc {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.alarm-clock-tick {
+  stroke: var(--faint);
+  stroke-width: 1;
+}
+
+.alarm-clock-tick.is-hour {
+  stroke: var(--muted);
+  stroke-width: 1.6;
+}
+
+.alarm-clock-tick.is-cardinal {
+  stroke: var(--accent);
+  stroke-width: 2.25;
+}
+
+.alarm-clock-num {
+  fill: var(--muted);
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+.alarm-clock-hand {
+  stroke: var(--text);
+  stroke-linecap: round;
+}
+
+.alarm-clock-hand.is-hour {
+  stroke-width: 5.5;
+}
+
+.alarm-clock-hand.is-minute {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+.alarm-clock-cap {
+  fill: var(--accent);
+  stroke: var(--raised);
+  stroke-width: 2.5;
+}
+
+.alarm-digital {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.alarm-time-pair {
+  display: grid;
+  justify-items: center;
+  gap: 0;
+}
+
+.alarm-time-pair strong {
+  font-size: 56px;
+  font-variant-numeric: tabular-nums;
+  line-height: 0.92;
+  min-width: 1.28em;
+  text-align: center;
+  letter-spacing: -0.02em;
+}
+
+.alarm-time-pair button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 22px;
+  color: var(--faint);
+  border-radius: 8px;
+  opacity: 0.5;
+}
+
+.alarm-time-pair button:hover {
+  opacity: 1;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.alarm-colon {
+  font-size: 44px;
+  color: var(--accent);
+  line-height: 1;
+  opacity: 0.72;
+  padding-bottom: 2px;
+}
+
+.alarm-period {
+  display: grid;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+.alarm-period button,
+.alarm-snooze button {
+  padding: 5px 9px;
+  border-radius: 8px;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.alarm-period button.on,
+.alarm-day-pills button.on,
+.alarm-snooze button.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.alarm-hero-caption {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+
+.alarm-field {
+  display: grid;
+  gap: 8px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.alarm-field > span {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.alarm-name input {
+  height: auto;
+  padding: 2px 0 8px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  font-size: 22px;
+  outline: none;
+}
+
+.alarm-name input:focus {
+  border-color: var(--accent);
+}
+
+.alarm-day-pills,
+.alarm-snooze {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.alarm-day-pills button {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--well);
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.alarm-snooze button {
+  min-width: 48px;
+  background: var(--well);
+}
+
+.alarm-sound-list {
+  display: grid;
+  gap: 2px;
+  max-height: 240px;
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--well);
+}
+
+.alarm-sound {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  border-radius: 8px;
+}
+
+.alarm-sound.selected {
+  background: var(--accent-soft);
+}
+
+.alarm-sound.playing .icon-btn {
+  color: var(--accent);
+}
+
+.alarm-sound button:first-child {
+  text-align: left;
+  padding: 7px 10px;
+}
+
+.alarm-sound strong {
+  display: block;
+  font-weight: 600;
+}
+
+.alarm-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 18px;
+}
+
+.danger-btn {
+  color: var(--danger);
+}
+
+.alarm-ring {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  backdrop-filter: blur(16px);
+}
+
+.alarm-ring-card {
+  width: min(400px, calc(100% - 40px));
+  padding: 32px 28px 26px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--raised);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.alarm-ring-kicker {
+  margin: 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.alarm-ring-card h1 {
+  margin: 0;
+  font-size: 56px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.alarm-ring-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 24px;
 }

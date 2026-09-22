@@ -29,6 +29,33 @@ export function IconTasks(props: IconProps) {
   )
 }
 
+export function IconAlarm(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="13" r="7" />
+      <path d="M12 10v3l2 1.5" />
+      <path d="M5 5 7.5 8M19 5 16.5 8" />
+    </Svg>
+  )
+}
+
+export function IconPlay(props: IconProps) {
+  return (
+    <Svg fill="currentColor" stroke="none" {...props}>
+      <path d="M8 6v12l10-6z" />
+    </Svg>
+  )
+}
+
+export function IconPause(props: IconProps) {
+  return (
+    <Svg fill="currentColor" stroke="none" {...props}>
+      <rect x="6" y="5" width="4" height="14" rx="1" />
+      <rect x="14" y="5" width="4" height="14" rx="1" />
+    </Svg>
+  )
+}
+
 export function IconBell(props: IconProps) {
   return (
     <Svg {...props}>
@@ -219,6 +246,22 @@ export function IconChevronRight(props: IconProps) {
   return (
     <Svg {...props}>
       <path d="M9 6l6 6-6 6" />
+    </Svg>
+  )
+}
+
+export function IconChevronUp(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M6 15l6-6 6 6" />
+    </Svg>
+  )
+}
+
+export function IconChevronDown(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M6 9l6 6 6-6" />
     </Svg>
   )
 }

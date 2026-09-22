@@ -1,11 +1,15 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
+  Alarm,
+  AlarmSound,
   AppSettings,
   MenuCommand,
   NoteRecord,
   NotesLibrary,
   OpenFileResult
 } from '../shared/types'
+
+type AlarmResult = { ok: true; alarm: Alarm; systemd?: boolean } | { ok: false; error: string }
 
 export interface TaskappApi {
   getSettings: () => Promise<AppSettings>
@@ -21,6 +25,19 @@ export interface TaskappApi {
   notePath: (id: string) => Promise<{ ok: boolean; path?: string; error?: string }>
   deleteNote: (id: string) => Promise<{ ok: boolean }>
   notesDir: () => Promise<string>
+  listAlarms: () => Promise<Alarm[]>
+  createAlarm: (input?: Partial<Alarm>) => Promise<AlarmResult>
+  updateAlarm: (id: string, patch: Partial<Alarm>) => Promise<AlarmResult>
+  deleteAlarm: (id: string) => Promise<{ ok: boolean; error?: string }>
+  listAlarmSounds: () => Promise<AlarmSound[]>
+  previewAlarmSound: (filePath: string) => Promise<{ ok: true; mime: string; data: string; native: boolean; stopped: boolean } | { ok: false; error: string }>
+  stopAlarmPreview: () => Promise<{ ok: boolean }>
+  ringingAlarm: () => Promise<Alarm | null>
+  hasAlarmSystemd: () => Promise<boolean>
+  stopAlarm: () => Promise<{ ok: boolean }>
+  snoozeAlarm: (id: string) => Promise<{ ok: boolean; error?: string }>
+  onAlarmRing: (handler: (alarm: Alarm) => void) => () => void
+  onAlarmStopped: (handler: () => void) => () => void
   showInFolder: (filePath: string) => Promise<void>
   showNotesFolder: () => Promise<void>
   minimize: () => void
@@ -49,6 +66,27 @@ const api: TaskappApi = {
   notePath: (id) => ipcRenderer.invoke('notes:path', id),
   deleteNote: (id) => ipcRenderer.invoke('notes:delete', id),
   notesDir: () => ipcRenderer.invoke('notes:dir'),
+  listAlarms: () => ipcRenderer.invoke('alarms:list'),
+  createAlarm: (input) => ipcRenderer.invoke('alarms:create', input),
+  updateAlarm: (id, patch) => ipcRenderer.invoke('alarms:update', id, patch),
+  deleteAlarm: (id) => ipcRenderer.invoke('alarms:delete', id),
+  listAlarmSounds: () => ipcRenderer.invoke('alarms:sounds'),
+  previewAlarmSound: (filePath) => ipcRenderer.invoke('alarms:preview', filePath),
+  stopAlarmPreview: () => ipcRenderer.invoke('alarms:stop-preview'),
+  ringingAlarm: () => ipcRenderer.invoke('alarms:ringing'),
+  hasAlarmSystemd: () => ipcRenderer.invoke('alarms:systemd'),
+  stopAlarm: () => ipcRenderer.invoke('alarms:stop'),
+  snoozeAlarm: (id) => ipcRenderer.invoke('alarms:snooze', id),
+  onAlarmRing: (handler) => {
+    const listener = (_event: unknown, alarm: Alarm) => handler(alarm)
+    ipcRenderer.on('alarm:ring', listener)
+    return () => ipcRenderer.removeListener('alarm:ring', listener)
+  },
+  onAlarmStopped: (handler) => {
+    const listener = () => handler()
+    ipcRenderer.on('alarm:stopped', listener)
+    return () => ipcRenderer.removeListener('alarm:stopped', listener)
+  },
   showInFolder: (filePath) => ipcRenderer.invoke('shell:show', filePath),
   showNotesFolder: () => ipcRenderer.invoke('shell:showNotes'),
   minimize: () => ipcRenderer.send('window:min'),

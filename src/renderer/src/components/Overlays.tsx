@@ -1,25 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
+import { THEMES, normalizeTheme } from '@shared/themes'
 import type { AppSettings, MenuCommand, ThemePreference } from '@shared/types'
 
 interface Command {
   id: MenuCommand
   label: string
   shortcut?: string
-  group: 'Note' | 'Edit' | 'View'
+  group: 'File' | 'Edit' | 'View'
 }
 
 const COMMANDS: Command[] = [
-  { id: 'command-palette', label: 'Command palette', shortcut: 'Ctrl+K', group: 'Note' },
-  { id: 'new', label: 'New note', shortcut: 'Ctrl+N', group: 'Note' },
-  { id: 'save', label: 'Save', shortcut: 'Ctrl+S', group: 'Note' },
-  { id: 'save-as', label: 'Save as…', shortcut: 'Ctrl+Shift+S', group: 'Note' },
-  { id: 'rename', label: 'Rename note', shortcut: 'F2', group: 'Note' },
-  { id: 'duplicate', label: 'Duplicate note', group: 'Note' },
-  { id: 'delete-note', label: 'Delete note', group: 'Note' },
-  { id: 'open', label: 'Open a file', shortcut: 'Ctrl+O', group: 'Note' },
-  { id: 'close', label: 'Close viewer', shortcut: 'Ctrl+W', group: 'Note' },
-  { id: 'show-in-folder', label: 'Show in folder', group: 'Note' },
-  { id: 'show-notes-folder', label: 'Show notes folder', group: 'Note' },
+  { id: 'command-palette', label: 'Command palette', shortcut: 'Ctrl+K', group: 'View' },
+  { id: 'new', label: 'New note', shortcut: 'Ctrl+N', group: 'File' },
+  { id: 'save', label: 'Save', shortcut: 'Ctrl+S', group: 'File' },
+  { id: 'save-as', label: 'Save as…', shortcut: 'Ctrl+Shift+S', group: 'File' },
+  { id: 'rename', label: 'Rename note', shortcut: 'F2', group: 'File' },
+  { id: 'duplicate', label: 'Duplicate note', group: 'File' },
+  { id: 'delete-note', label: 'Delete note', group: 'File' },
+  { id: 'open', label: 'Open a file', shortcut: 'Ctrl+O', group: 'File' },
+  { id: 'close', label: 'Close viewer', shortcut: 'Ctrl+W', group: 'File' },
+  { id: 'show-in-folder', label: 'Show in folder', group: 'File' },
+  { id: 'show-notes-folder', label: 'Show notes folder', group: 'File' },
   { id: 'undo', label: 'Undo', shortcut: 'Ctrl+Z', group: 'Edit' },
   { id: 'redo', label: 'Redo', shortcut: 'Ctrl+Shift+Z', group: 'Edit' },
   { id: 'cut', label: 'Cut', shortcut: 'Ctrl+X', group: 'Edit' },
@@ -27,11 +28,12 @@ const COMMANDS: Command[] = [
   { id: 'paste', label: 'Paste', shortcut: 'Ctrl+V', group: 'Edit' },
   { id: 'select-all', label: 'Select all', shortcut: 'Ctrl+A', group: 'Edit' },
   { id: 'find', label: 'Find', shortcut: 'Ctrl+F', group: 'Edit' },
-  { id: 'toggle-theme', label: 'Toggle theme', shortcut: 'Ctrl+Shift+T', group: 'View' },
+  { id: 'toggle-theme', label: 'Next theme', shortcut: 'Ctrl+Shift+T', group: 'View' },
+  ...THEMES.map((item) => ({ id: item.command, label: item.label, group: 'View' as const })),
   { id: 'toggle-wrap', label: 'Toggle word wrap', shortcut: 'Alt+Z', group: 'View' },
   { id: 'font-larger', label: 'Larger text', shortcut: 'Ctrl+=', group: 'View' },
   { id: 'font-smaller', label: 'Smaller text', shortcut: 'Ctrl+-', group: 'View' },
-  { id: 'settings', label: 'Settings', shortcut: 'Ctrl+,', group: 'View' },
+  { id: 'settings', label: 'Settings', shortcut: 'Ctrl+,', group: 'File' },
   { id: 'shortcuts', label: 'Keyboard shortcuts', shortcut: 'Ctrl+/', group: 'View' }
 ]
 
@@ -116,12 +118,12 @@ export function SettingsPanel({ settings, notesDir, onChange, onShowNotes, onClo
         <label className="field">
           <span>Theme</span>
           <select
-            value={settings.theme}
+            value={normalizeTheme(settings.theme)}
             onChange={(event) => onChange({ ...settings, theme: event.target.value as ThemePreference })}
           >
-            <option value="system">System</option>
-            <option value="ink">Ink</option>
-            <option value="paper">Paper</option>
+            {THEMES.map((item) => (
+              <option key={item.id} value={item.id}>{item.label}</option>
+            ))}
           </select>
         </label>
         <label className="field">

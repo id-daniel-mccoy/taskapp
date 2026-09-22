@@ -29,7 +29,7 @@ fi
 
 echo "Installing Taskapp into $ROOT"
 npm install
-chmod +x "$ROOT/taskapp" "$ROOT/install.sh"
+chmod +x "$ROOT/taskapp" "$ROOT/taskapp-alarm" "$ROOT/install.sh"
 
 electron_ready() {
   [[ -f "$ROOT/node_modules/electron/path.txt" && -x "$ROOT/node_modules/electron/dist/electron" ]]
@@ -94,7 +94,7 @@ if [[ "$INSTALL_DESKTOP" -eq 1 && "$(uname -s)" == "Linux" ]]; then
   sed -e "s|@EXEC@|$ROOT/taskapp|g" \
     -e "s|@ROOT@|$ROOT|g" \
     "$ROOT/linux/taskapp.desktop" > "$APP_DIR/taskapp.desktop"
-  chmod +x "$ROOT/taskapp"
+  chmod +x "$ROOT/taskapp" "$ROOT/taskapp-alarm"
   rm -f "$ICON_BASE/icon-theme.cache"
   if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database "$APP_DIR" >/dev/null 2>&1 || true

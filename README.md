@@ -34,7 +34,7 @@ This is the first surface of a larger product. Tasks and reminders come next. Th
 - **Yours, on disk.** The notes library lives in the app data folder on this machine. Nothing is uploaded.
 - **At home on Linux.** Install once, then launch from the terminal, the application menu, or **Open with**.
 
-Ink and Paper themes, a command palette, and a compact notepad toolbar are built in.
+Ink-and-paper color was the default look. Themes now include Light, Dark, Ocean Dream, Dark Forest, and Purple Rain, plus a command palette and a compact notepad toolbar.
 
 ---
 
@@ -117,7 +117,7 @@ The first launch compiles the app and can take a few seconds. After install, Tas
 
 If Taskapp is already running, **Open with** hands the file to that window instead of starting a second copy.
 
-The window is the app. A local Vite server on port 3000 is only what Electron loads during development; you do not open that URL in a browser.
+The window is the app. A local Vite server on port 4718 is only what Electron loads during development; you do not open that URL in a browser.
 
 ---
 
@@ -131,7 +131,7 @@ The window is the app. A local Vite server on port 3000 is only what Electron lo
 | **PDF** | Read-only, full-document scroll, page controls, and zoom. |
 | **Images** | Read-only viewer with a transparency checkerboard, fit, and zoom. PNG, JPEG, GIF, WebP, BMP, ICO, SVG, AVIF. TIFF is attempted (Chromium often cannot decode it). |
 
-Drag files onto the window, use **Open** in the title bar, or pass paths on the command line.
+Drag files onto the window, use **File → Open**, or pass paths on the command line.
 
 Notes are stored under the Electron user-data directory. On Linux that is typically `~/.config/Taskapp/notes/`. Settings → **Open notes folder** if you want the exact path.
 
@@ -149,7 +149,7 @@ Notes are stored under the Electron user-data directory. On Linux that is typica
 | `F2` | Rename note |
 | `Ctrl+W` | Close the current file tab |
 | `Ctrl+F` | Find |
-| `Ctrl+Shift+T` | Toggle Ink / Paper |
+| `Ctrl+Shift+T` | Next theme |
 | `Alt+Z` | Word wrap |
 | `Ctrl+,` | Settings |
 | `Ctrl+/` | Keyboard shortcuts |

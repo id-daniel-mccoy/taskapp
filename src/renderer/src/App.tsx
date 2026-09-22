@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react'
 import { ActivityRail } from './components/ActivityRail'
+import { AlarmEditor } from './components/AlarmEditor'
+import { AlarmOverlay } from './components/AlarmOverlay'
+import { AlarmsList } from './components/AlarmsList'
+import { AudioViewer } from './components/AudioViewer'
 import { CommandPalette, ConfirmDialog, SettingsPanel, ShortcutsPanel } from './components/Overlays'
 import { JsonViewer } from './components/JsonViewer'
 import { ImageViewer } from './components/ImageViewer'
@@ -11,11 +15,14 @@ import { TabBar } from './components/TabBar'
 import { TextFileViewer } from './components/TextFileViewer'
 import { TitleBar } from './components/TitleBar'
 import { Welcome } from './components/Welcome'
+import { useAlarms } from './hooks/useAlarms'
 import { useWorkspace } from './hooks/useWorkspace'
 
 export function App() {
   const workspace = useWorkspace()
-  const [notesOpen, setNotesOpen] = useState(true)
+  const alarms = useAlarms()
+  const [section, setSection] = useState<'notes' | 'alarms'>('notes')
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const {
     activeNote,
     activeViewer,
@@ -40,10 +47,13 @@ export function App() {
       }
       if (meta && event.key.toLowerCase() === 'n') {
         event.preventDefault()
+        setSection('notes')
+        setSidebarOpen(true)
         void newNote()
       }
       if (meta && event.key.toLowerCase() === 'o') {
         event.preventDefault()
+        setSection('notes')
         void openFiles()
       }
       if (meta && event.key.toLowerCase() === 's' && event.shiftKey) {
@@ -81,6 +91,10 @@ export function App() {
         event.preventDefault()
         setShortcutsOpen(true)
       }
+      if (meta && event.key.toLowerCase() === 'q') {
+        event.preventDefault()
+        window.taskapp.close()
+      }
       if (event.key === 'Escape') {
         setPaletteOpen(false)
         setSettingsOpen(false)
@@ -92,11 +106,28 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [activeNote, activeViewer, closeViewer, handleMenu, newNote, openFiles, saveActive, saveActiveAs, setPaletteOpen, setRenamingId, setSettingsOpen, setShortcutsOpen])
 
+  useEffect(() => {
+    if (activeViewer) setSection('notes')
+  }, [activeViewer])
+
+  useEffect(() => {
+    if (!alarms.ringing) return
+    setSection('alarms')
+    setSidebarOpen(true)
+  }, [alarms.ringing])
+
   if (!workspace.ready) {
     return <div className="app" />
   }
 
-  const showWelcome = !activeNote && !activeViewer
+  const showWelcome = section === 'notes' && !activeNote && !activeViewer
+  const alarmHint = !alarms.systemd && alarms.alarms.some((item) => item.enabled)
+    ? 'Alarm timers need systemd — they will not fire if Taskapp is closed'
+    : alarms.nextUp
+      ? `Next · ${alarms.nextUp}`
+      : section === 'alarms'
+        ? 'No upcoming alarms'
+        : null
 
   return (
     <div
@@ -116,47 +147,91 @@ export function App() {
             }
           })
           .filter(Boolean)
-        if (paths.length) void workspace.openPaths(paths)
+        if (paths.length) {
+          setSection('notes')
+          void workspace.openPaths(paths)
+        }
       }}
     >
       <TitleBar
-        note={activeNote}
-        viewer={activeViewer}
+        note={section === 'notes' ? activeNote : null}
+        viewer={section === 'notes' ? activeViewer : null}
+        heading={section === 'alarms' ? alarms.active?.label ?? 'Alarms' : undefined}
         theme={workspace.theme}
         titleFocusKey={workspace.titleFocusKey}
-        onNew={() => void workspace.newNote()}
-        onOpen={() => void workspace.openFiles()}
-        onSave={() => void workspace.saveActive()}
-        onPalette={() => workspace.setPaletteOpen(true)}
-        onTheme={() => workspace.handleMenu('toggle-theme')}
-        onSettings={() => workspace.setSettingsOpen(true)}
+        onMenu={(command) => {
+          if (command === 'new' || command === 'open' || command === 'rename' || command === 'duplicate' || command === 'delete-note' || command === 'find') {
+            setSection('notes')
+          }
+          if (command === 'new') setSidebarOpen(true)
+          workspace.handleMenu(command)
+        }}
         onRename={(title) => activeNote && void workspace.renameNote(activeNote.id, title)}
       />
-      <div className={`shell${notesOpen ? '' : ' notes-collapsed'}`}>
-        <ActivityRail notesOpen={notesOpen} onToggleNotes={() => setNotesOpen((open) => !open)} />
-        <NotesList
-          notes={workspace.notes}
-          activeId={workspace.activeNoteId}
-          renamingId={workspace.renamingId}
-          onSelect={workspace.selectNote}
-          onNew={() => void workspace.newNote()}
-          onRename={(id, title) => void workspace.renameNote(id, title)}
-          onStartRename={workspace.setRenamingId}
-          onCancelRename={() => workspace.setRenamingId(null)}
-          onDuplicate={(id) => void workspace.duplicateNote(id)}
-          onShowFile={(id) => void workspace.showNoteFile(id)}
-          onDelete={workspace.requestDelete}
-          collapsed={!notesOpen}
+      <div className={`shell${sidebarOpen ? '' : ' notes-collapsed'}${section === 'alarms' ? ' section-alarms' : ''}`}>
+        <ActivityRail
+          section={section}
+          onNotes={() => {
+            if (section === 'notes') setSidebarOpen((open) => !open)
+            else {
+              setSection('notes')
+              setSidebarOpen(true)
+            }
+          }}
+          onAlarms={() => {
+            if (section === 'alarms') setSidebarOpen((open) => !open)
+            else {
+              setSection('alarms')
+              setSidebarOpen(true)
+            }
+          }}
         />
-        <main className="workspace">
-          <TabBar
-            docs={workspace.viewers}
-            activeId={workspace.activeViewerId}
-            onSelect={workspace.setActiveViewerId}
-            onClose={workspace.closeViewer}
+        {section === 'notes' ? (
+          <NotesList
+            notes={workspace.notes}
+            activeId={workspace.activeNoteId}
+            renamingId={workspace.renamingId}
+            onSelect={workspace.selectNote}
+            onNew={() => void workspace.newNote()}
+            onRename={(id, title) => void workspace.renameNote(id, title)}
+            onStartRename={workspace.setRenamingId}
+            onCancelRename={() => workspace.setRenamingId(null)}
+            onDuplicate={(id) => void workspace.duplicateNote(id)}
+            onShowFile={(id) => void workspace.showNoteFile(id)}
+            onDelete={workspace.requestDelete}
+            collapsed={!sidebarOpen}
           />
+        ) : (
+          <AlarmsList
+            alarms={alarms.alarms}
+            activeId={alarms.activeId}
+            onSelect={alarms.setActiveId}
+            onNew={() => void alarms.create()}
+            onToggle={(id, enabled) => alarms.update(id, { enabled }, true)}
+            collapsed={!sidebarOpen}
+          />
+        )}
+        <main className="workspace">
+          {section === 'notes' && (
+            <TabBar
+              docs={workspace.viewers}
+              activeId={workspace.activeViewerId}
+              onSelect={workspace.setActiveViewerId}
+              onClose={workspace.closeViewer}
+            />
+          )}
           <section className="stage">
-            {showWelcome && (
+            {section === 'alarms' && (
+              <AlarmEditor
+                alarm={alarms.active}
+                sounds={alarms.sounds}
+                previewing={alarms.previewing}
+                onChange={alarms.update}
+                onPreview={alarms.preview}
+                onDelete={alarms.setPendingDelete}
+              />
+            )}
+            {section === 'notes' && showWelcome && (
               <Welcome
                 notes={workspace.notes}
                 onNew={() => void workspace.newNote()}
@@ -164,7 +239,7 @@ export function App() {
                 onOpenNote={workspace.selectNote}
               />
             )}
-            {activeNote && !activeViewer && (
+            {section === 'notes' && activeNote && !activeViewer && (
               <NoteEditor
                 note={activeNote}
                 wordWrap={workspace.settings.wordWrap}
@@ -173,7 +248,7 @@ export function App() {
                 onCommand={(command) => workspace.handleMenu(command)}
               />
             )}
-            {activeViewer?.kind === 'json' && (
+            {section === 'notes' && activeViewer?.kind === 'json' && (
               <JsonViewer
                 name={activeViewer.name}
                 path={activeViewer.path}
@@ -184,7 +259,7 @@ export function App() {
                 onChange={workspace.updateViewerContent}
               />
             )}
-            {activeViewer?.kind === 'text-file' && (
+            {section === 'notes' && activeViewer?.kind === 'text-file' && (
               <TextFileViewer
                 name={activeViewer.name}
                 path={activeViewer.path}
@@ -196,8 +271,9 @@ export function App() {
                 onChange={workspace.updateViewerContent}
               />
             )}
-            {activeViewer?.kind === 'pdf' && <PdfViewer doc={activeViewer} />}
-            {activeViewer?.kind === 'image' && <ImageViewer doc={activeViewer} />}
+            {section === 'notes' && activeViewer?.kind === 'pdf' && <PdfViewer doc={activeViewer} />}
+            {section === 'notes' && activeViewer?.kind === 'image' && <ImageViewer doc={activeViewer} />}
+            {section === 'notes' && activeViewer?.kind === 'audio' && <AudioViewer doc={activeViewer} />}
             <div className="toasts">
               {workspace.toasts.map((item) => (
                 <div key={item.id} className={`toast ${item.tone}`}>{item.text}</div>
@@ -207,10 +283,12 @@ export function App() {
         </main>
       </div>
       <StatusBar
-        note={activeNote && !activeViewer ? activeNote : null}
-        viewer={activeViewer}
+        note={section === 'notes' && activeNote && !activeViewer ? activeNote : null}
+        viewer={section === 'notes' ? activeViewer : null}
         wordWrap={workspace.settings.wordWrap}
         saving={Boolean(activeNote?.dirty || (activeViewer && 'dirty' in activeViewer && activeViewer.dirty))}
+        statusHint={alarmHint}
+        modeLabel={section === 'alarms' ? 'Alarms' : undefined}
       />
       {workspace.paletteOpen && (
         <CommandPalette onClose={() => workspace.setPaletteOpen(false)} onRun={workspace.handleMenu} />
@@ -234,6 +312,25 @@ export function App() {
           confirmLabel="Delete"
           onConfirm={() => void workspace.confirmDelete()}
           onCancel={() => workspace.setPendingDelete(null)}
+        />
+      )}
+      {alarms.pendingDelete && (
+        <ConfirmDialog
+          title="Delete this alarm?"
+          body="The scheduled timer will be removed from this computer."
+          confirmLabel="Delete"
+          onConfirm={() => {
+            const id = alarms.pendingDelete
+            if (id) void alarms.remove(id)
+          }}
+          onCancel={() => alarms.setPendingDelete(null)}
+        />
+      )}
+      {alarms.ringing && (
+        <AlarmOverlay
+          alarm={alarms.ringing}
+          onStop={() => void alarms.stop()}
+          onSnooze={() => void alarms.snooze(alarms.ringing!.id)}
         />
       )}
     </div>

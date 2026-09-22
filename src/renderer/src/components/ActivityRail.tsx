@@ -1,25 +1,35 @@
-import { IconBell, IconNotes, IconTasks } from '../lib/icons'
+import { IconAlarm, IconBell, IconNotes, IconTasks } from '../lib/icons'
 
 interface Props {
-  notesOpen: boolean
-  onToggleNotes: () => void
+  section: 'notes' | 'alarms'
+  onNotes: () => void
+  onAlarms: () => void
 }
 
 const railIcon = { width: 22, height: 22 }
 
-export function ActivityRail({ notesOpen, onToggleNotes }: Props) {
+export function ActivityRail({ section, onNotes, onAlarms }: Props) {
   return (
     <nav className="rail" aria-label="Taskapp sections">
       <button
         type="button"
-        className={`rail-btn${notesOpen ? ' active' : ''}`}
-        title={notesOpen ? 'Hide notes' : 'Show notes'}
+        className={`rail-btn${section === 'notes' ? ' active' : ''}`}
+        title="Notes"
         aria-label="Notes"
-        aria-expanded={notesOpen}
-        aria-pressed={notesOpen}
-        onClick={onToggleNotes}
+        aria-pressed={section === 'notes'}
+        onClick={onNotes}
       >
         <IconNotes {...railIcon} />
+      </button>
+      <button
+        type="button"
+        className={`rail-btn${section === 'alarms' ? ' active' : ''}`}
+        title="Alarms"
+        aria-label="Alarms"
+        aria-pressed={section === 'alarms'}
+        onClick={onAlarms}
+      >
+        <IconAlarm {...railIcon} />
       </button>
       <button className="rail-btn" disabled title="Tasks">
         <IconTasks {...railIcon} />

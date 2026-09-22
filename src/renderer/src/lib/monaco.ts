@@ -22,50 +22,85 @@ monacoScope.MonacoEnvironment = {
 
 loader.config({ monaco })
 
-export function registerThemes(): void {
-  monaco.editor.defineTheme('taskapp-ink', {
-    base: 'vs-dark',
+function defineTheme(
+  id: string,
+  scheme: 'light' | 'dark',
+  colors: { well: string; text: string; raised: string; border: string; accent: string; faint: string; danger: string; ok: string }
+): void {
+  monaco.editor.defineTheme(`taskapp-${id}`, {
+    base: scheme === 'dark' ? 'vs-dark' : 'vs',
     inherit: true,
     rules: [
-      { token: 'comment', foreground: '6d7680', fontStyle: 'italic' },
-      { token: 'string', foreground: 'd4a05a' },
-      { token: 'keyword', foreground: 'd4676a' },
-      { token: 'number', foreground: '7dba8a' }
+      { token: 'comment', foreground: colors.faint.replace('#', ''), fontStyle: 'italic' },
+      { token: 'string', foreground: colors.accent.replace('#', '') },
+      { token: 'keyword', foreground: colors.danger.replace('#', '') },
+      { token: 'number', foreground: colors.ok.replace('#', '') }
     ],
     colors: {
-      'editor.background': '#121820',
-      'editor.foreground': '#ebe6dc',
-      'editor.lineHighlightBackground': '#1c252e66',
-      'editorCursor.foreground': '#d4a05a',
-      'editorLineNumber.foreground': '#6d7680',
-      'editorLineNumber.activeForeground': '#d4a05a',
-      'editor.selectionBackground': '#d4a05a33',
-      'editorWidget.background': '#1c252e',
-      'editorWidget.border': '#2a3540',
-      'scrollbarSlider.background': '#2a354088'
+      'editor.background': colors.well,
+      'editor.foreground': colors.text,
+      'editor.lineHighlightBackground': `${colors.raised}66`,
+      'editorCursor.foreground': colors.accent,
+      'editorLineNumber.foreground': colors.faint,
+      'editorLineNumber.activeForeground': colors.accent,
+      'editor.selectionBackground': `${colors.accent}33`,
+      'editorWidget.background': colors.raised,
+      'editorWidget.border': colors.border,
+      'scrollbarSlider.background': `${colors.border}88`
     }
   })
+}
 
-  monaco.editor.defineTheme('taskapp-paper', {
-    base: 'vs',
-    inherit: true,
-    rules: [
-      { token: 'comment', foreground: '94897a', fontStyle: 'italic' },
-      { token: 'string', foreground: '9a6b2f' },
-      { token: 'keyword', foreground: 'b5443a' },
-      { token: 'number', foreground: '3d7a4c' }
-    ],
-    colors: {
-      'editor.background': '#fbf7f0',
-      'editor.foreground': '#2a241c',
-      'editor.lineHighlightBackground': '#efe8db80',
-      'editorCursor.foreground': '#9a6b2f',
-      'editorLineNumber.foreground': '#94897a',
-      'editorLineNumber.activeForeground': '#9a6b2f',
-      'editor.selectionBackground': '#9a6b2f26',
-      'editorWidget.background': '#fffdf8',
-      'editorWidget.border': '#d8ccb8'
-    }
+export function registerThemes(): void {
+  defineTheme('dark', 'dark', {
+    well: '#121820',
+    text: '#ebe6dc',
+    raised: '#1c252e',
+    border: '#2a3540',
+    accent: '#e2ac4a',
+    faint: '#6d7680',
+    danger: '#e07074',
+    ok: '#7fc992'
+  })
+  defineTheme('light', 'light', {
+    well: '#eef1f4',
+    text: '#1a2128',
+    raised: '#ffffff',
+    border: '#d0dae4',
+    accent: '#2f86b3',
+    faint: '#8094a4',
+    danger: '#c2473c',
+    ok: '#2f8f4e'
+  })
+  defineTheme('ocean-dream', 'light', {
+    well: '#d5f0f4',
+    text: '#143841',
+    raised: '#ffffff',
+    border: '#a8d5de',
+    accent: '#0ea3b8',
+    faint: '#6ea8b3',
+    danger: '#d05656',
+    ok: '#1c9d78'
+  })
+  defineTheme('dark-forest', 'dark', {
+    well: '#101810',
+    text: '#e3f0d4',
+    raised: '#1e2d23',
+    border: '#314c38',
+    accent: '#8fd45a',
+    faint: '#6b8a6c',
+    danger: '#e07d68',
+    ok: '#8fd45a'
+  })
+  defineTheme('purple-rain', 'dark', {
+    well: '#120e18',
+    text: '#f3e9fb',
+    raised: '#271f34',
+    border: '#433056',
+    accent: '#d48ef2',
+    faint: '#8b74a8',
+    danger: '#e86e96',
+    ok: '#7ed9bc'
   })
 }
 
