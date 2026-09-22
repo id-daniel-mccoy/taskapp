@@ -3,7 +3,7 @@
   "productName": "Taskapp",
   "version": "0.1.0",
   "private": true,
-  "description": "A Linux-first notepad for notes, text files, JSON, PDFs, and images.",
+  "description": "A Linux notepad for local notes, files, and alarms.",
   "author": "Ascendry Labs",
   "license": "MIT",
   "engines": {

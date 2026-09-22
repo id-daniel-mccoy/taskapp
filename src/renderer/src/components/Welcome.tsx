@@ -16,7 +16,7 @@ export function Welcome({ notes, onNew, onOpen, onOpenNote }: Props) {
           <img src={icon} alt="Taskapp" />
           <div>
             <h1>Taskapp</h1>
-            <p>Write notes as local .txt files. Drop or open JSON, PDFs, images, audio, and other text files — text files can be edited and saved in place, but they are not notes.</p>
+            <p>Notes live as .txt files on this computer. Open Markdown, JSON, PDFs, images, and audio beside them — saved in place, never turned into notes.</p>
           </div>
         </div>
         <div className="welcome-actions">
@@ -26,7 +26,7 @@ export function Welcome({ notes, onNew, onOpen, onOpenNote }: Props) {
         <div className="recents">
           <h2>Notes on this computer</h2>
           {notes.length === 0 ? (
-            <p className="empty-note">Nothing saved yet. Create a note and it will still be here after you quit.</p>
+            <p className="empty-note">Start a note. It will still be here the next time you open Taskapp.</p>
           ) : (
             <div className="recent-list">
               {notes.map((note) => (

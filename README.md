@@ -5,11 +5,11 @@
 <h1 align="center">Taskapp</h1>
 
 <p align="center">
-  <strong>A quiet notepad for notes, files, and the work that sits beside them.</strong>
+  <strong>A Linux notepad for writing that stays on your computer.</strong>
 </p>
 
 <p align="center">
-  Linux first &nbsp;·&nbsp; Local by default &nbsp;·&nbsp; Open source
+  Notes, files, and alarms &nbsp;·&nbsp; Local by default &nbsp;·&nbsp; Open source
 </p>
 
 <p align="center">
@@ -18,58 +18,47 @@
   <img src="https://img.shields.io/badge/license-MIT-d4a05a?style=flat-square" alt="MIT License">
 </p>
 
-Taskapp is a Linux-first desktop notepad. Notes are ordinary `.txt` files on your computer. Open a Markdown file, a JSON document, a PDF, or an image and Taskapp treats it as what it is — a file on disk — not a note imported into a library.
+Taskapp is the notepad you keep open all day. Write a thought, open the file beside it, set an alarm for later. Notes are ordinary `.txt` files with names you choose. Markdown, source, JSON, PDFs, images, and audio open as themselves — not as something imported into a cloud library.
 
-This is the first surface of a larger product. Tasks and reminders come next. The editor, the file viewers, and the local-first habits are the foundation.
+There is no account and nothing is uploaded. Install it once on Linux, then launch it from the application menu, the terminal, or **Open with**.
 
 **Developed by Ascendry Labs.**
 
----
-
-## Highlights
-
-- **Notes that stay notes.** Each note is a `.txt` file plus a name you choose. Titles are not inferred from the first line.
-- **Files stay files.** Markdown, source, JSON, and similar text open as editable tabs. Save writes back to the original path. Save as never creates a note.
-- **Readers for the rest.** PDFs scroll as a full document. Images sit on a checkerboard so transparency is honest.
-- **Yours, on disk.** The notes library lives in the app data folder on this machine. Nothing is uploaded.
-- **At home on Linux.** Install once, then launch from the terminal, the application menu, or **Open with**.
-- **Pick up where you left off.** The last note and open file tabs come back on launch. File tabs get syntax highlighting; Markdown can toggle a preview.
-
-Ink-and-paper color was the default look. Themes now include Light, Dark, Ocean Dream, Dark Forest, and Purple Rain, plus a command palette and a compact notepad toolbar.
+<p align="center">
+  <a href="#install"><strong>Install Taskapp →</strong></a>
+</p>
 
 ---
 
-## Supported platforms
+## Why people use it
 
-| Platform | Status |
-| --- | --- |
-| **Linux** (X11 and Wayland) | Supported. This is the current target: installer, launcher, icon, menu entry, and **Open with**. |
-| macOS | Not yet. The UI is Electron, so a later port is planned. |
-| Windows | Not yet. Same as macOS. |
+**A real notepad.** New notes are drafts until you name them. Each one is a `.txt` file in a folder on this machine, not a first-line title guessed by the app.
 
-The Linux path is tested as a local checkout on x86_64 with Node.js 18 or newer (including nvm). Aarch64 is not a first-class target yet.
+**Files stay files.** Open Markdown, HTML, CSS, JavaScript, TypeScript, Python, JSON, YAML, and other text as tabs. Save writes back to the original path. Syntax highlighting comes with the file; Markdown can toggle a preview when you want one.
 
----
+**Readers that get out of the way.** PDFs scroll as a full document. Images sit on a checkerboard so transparency is honest. Audio plays in place. Drag a file onto the window, or pass paths on the command line.
 
-## Requirements
+**Alarms that keep their promise.** Set a time, a repeat, and a tone. On a typical Linux desktop the schedule is a user timer, so it can still ring after you close the window.
 
-- **Node.js 18+** and **npm**
-- A graphical session (the window is an Electron app)
-- Network on first install, so npm and the Electron runtime can download
+**Yours, on this computer.** The notes library lives in app data — usually `~/.config/Taskapp/notes/` on Linux. Settings → **Open notes folder** if you want the exact path. Find, replace, go to line, and the last session come back the next time you launch.
 
-On Debian or Ubuntu:
+**At home on Linux.** One installer gives you a menu entry, an icon, and file associations. Right-click a supported file and choose **Open with → Taskapp**. If Taskapp is already running, the file lands in that window.
 
-```bash
-sudo apt install nodejs npm
-```
-
-If you use nvm, fnm, or Volta, install from a terminal as usual. The Taskapp launcher finds nvm’s Node even when GNOME starts the app without your shell profile.
+Five themes ship with the app: Light, Dark, Ocean Dream, Dark Forest, and Purple Rain. Switch from **View**, the command palette, or `Ctrl+Shift+T`.
 
 ---
 
 ## Install
 
-Clone the repository, then run the installer from the project root:
+You need **Node.js 18+**, **npm**, and a graphical Linux session (X11 or Wayland). On Debian or Ubuntu:
+
+```bash
+sudo apt install nodejs npm
+```
+
+nvm, fnm, and Volta work too. The launcher finds nvm’s Node even when GNOME starts the app without your shell profile.
+
+Then, from a terminal:
 
 ```bash
 git clone https://github.com/id-daniel-mccoy/taskapp.git
@@ -78,63 +67,48 @@ chmod +x install.sh taskapp
 ./install.sh
 ```
 
-`install.sh` will:
+That checks Node, installs dependencies, makes sure Electron is ready, and adds **Taskapp** to your application menu with icons and **Open with** support.
 
-1. Check for Node.js 18+ and npm
-2. Run `npm install`
-3. Make sure the Electron runtime is present (and finish extracting it if npm left that incomplete)
-4. On Linux, install a **Taskapp** application-menu entry, icons, and file associations
-
-Skip the desktop entry if you only want the CLI:
+Only want the command in this folder?
 
 ```bash
 ./install.sh --no-desktop
 ```
 
-If GitHub releases are blocked on your network, set an Electron mirror and run the installer again:
+If GitHub releases are blocked on your network:
 
 ```bash
 export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
 ./install.sh
 ```
 
-Re-run `./install.sh` after pulling updates that change the desktop file or icons. GNOME may keep a cached icon until you close the application overview or start a new session.
+Re-run `./install.sh` after pulling updates that change the desktop file or icons. GNOME may keep a cached icon until you close the application overview or log in again.
 
 ---
 
-## Run
+## Use it
 
 ```bash
 ./taskapp
 ```
 
-Or open files directly:
+Open files directly:
 
 ```bash
 ./taskapp notes.md data.json report.pdf photo.png
 ```
 
-The first launch compiles the app and can take a few seconds. After install, Taskapp also appears in the application menu. Right-click a supported file in the file manager and choose **Open with → Taskapp**.
+The first launch can take a few seconds. After that, Taskapp is in your application menu like any other desktop app.
 
-If Taskapp is already running, **Open with** hands the file to that window instead of starting a second copy.
-
-The window is the app. A local Vite server on port 4718 is only what Electron loads during development; you do not open that URL in a browser.
-
----
-
-## What it opens
-
-| Kind | What happens |
+| You drop in… | Taskapp does… |
 | --- | --- |
-| **Notes** (`.txt`, `.text`) | Opening from disk imports a copy into the notes library. New notes are drafts until you name them. |
-| **Other text** | Markdown, HTML, CSS, JS/TS, XML, CSV, YAML, TOML, shell, and common source files open as editable file tabs with syntax highlighting. Markdown can toggle a preview. Save / Save as write to disk. |
-| **JSON** | Same as other text files, with a live valid/invalid banner. Formatted once on open. |
-| **PDF** | Read-only, full-document scroll, page controls, and zoom. |
-| **Images** | Read-only viewer with a transparency checkerboard, fit, and zoom. PNG, JPEG, GIF, WebP, BMP, ICO, SVG, AVIF. TIFF is attempted (Chromium often cannot decode it). |
+| A **note** (`.txt`) | Keeps it in your notes library, with the name you gave it. |
+| **Markdown, source, JSON**, and similar text | Opens an editable tab, highlighted, saved back to disk. |
+| A **PDF** | Full-document scroll, page controls, and zoom. |
+| An **image** | Fit and zoom on a transparency checkerboard. PNG, JPEG, GIF, WebP, BMP, ICO, SVG, AVIF, and more. |
+| **Audio** | Plays in the app. |
 
-Drag files onto the window, use **File → Open**, or pass paths on the command line.
-
-Notes are stored under the Electron user-data directory. On Linux that is typically `~/.config/Taskapp/notes/`. Settings → **Open notes folder** if you want the exact path.
+**File → Open**, drag onto the window, or **Open with** all take the same path. Notes and files never get mixed: saving a file will not create a note, and a note will not overwrite a random path on disk.
 
 ---
 
@@ -145,41 +119,33 @@ Notes are stored under the Electron user-data directory. On Linux that is typica
 | `Ctrl+K` | Command palette |
 | `Ctrl+N` | New note |
 | `Ctrl+O` | Open a file |
-| `Ctrl+S` | Save |
-| `Ctrl+Shift+S` | Save as |
+| `Ctrl+S` / `Ctrl+Shift+S` | Save / Save as |
 | `F2` | Rename note |
 | `Ctrl+W` | Close the current file tab |
-| `Ctrl+F` | Find |
-| `Ctrl+H` | Replace |
+| `Ctrl+F` / `Ctrl+H` | Find / Replace |
 | `Ctrl+G` | Go to line |
-| `Tab` / `Shift+Tab` | Indent or outdent the current lines in a note |
+| `Tab` / `Shift+Tab` | Indent or outdent in a note |
 | `Ctrl+Shift+T` | Next theme |
 | `Alt+Z` | Word wrap |
 | `Ctrl+,` | Settings |
 | `Ctrl+/` | Keyboard shortcuts |
 
-Click the notes icon on the left rail to hide or show the notes list.
-
----
-
-## Project layout
-
-```text
-install.sh              Linux installer
-taskapp                 Launcher (finds Node, starts Electron)
-linux/taskapp.desktop   Application menu and Open with
-resources/              App icon and bundled Corinthia font
-src/main/               Electron main process, notes library, file I/O
-src/preload/            Context-bridge API
-src/renderer/           React UI
-src/shared/             MIME map and shared types
-```
+Click the notes icon on the left rail to hide or show the list. Search the list as you type.
 
 ---
 
 ## Contributing
 
-Issues and pull requests are welcome. Keep changes focused. Match the tone of the UI: calm, local, and specific about what is a note versus what is a file.
+Issues and pull requests are welcome. Keep changes focused, and keep the product honest: notes are notes, files are files, and the app stays local.
+
+```text
+install.sh              Linux installer
+taskapp                 Launcher
+linux/taskapp.desktop   Application menu and Open with
+src/main/               Desktop shell, notes library, file I/O
+src/renderer/           Interface
+src/shared/             Shared types
+```
 
 ---
 

@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=Taskapp
 GenericName=Text Editor
-Comment=A notepad for notes, text files, JSON, PDFs, images, and audio
+Comment=Write notes locally. Open files, PDFs, images, and audio without an account.
 Exec="@EXEC@" %F
 TryExec=@EXEC@
 Path=@ROOT@
