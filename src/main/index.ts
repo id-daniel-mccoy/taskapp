@@ -35,7 +35,8 @@ const defaultSettings: AppSettings = {
   theme: 'dark',
   wordWrap: true,
   fontSize: 15,
-  recents: []
+  recents: [],
+  session: { noteId: null, files: [], activeFile: null }
 }
 
 let mainWindow: BrowserWindow | null = null
@@ -55,7 +56,18 @@ async function loadSettings(): Promise<AppSettings> {
   try {
     const raw = await readFile(settingsPath(), 'utf8')
     const parsed = JSON.parse(raw) as Partial<AppSettings>
-    settingsCache = { ...defaultSettings, ...parsed, theme: normalizeTheme(parsed.theme) }
+    settingsCache = {
+      ...defaultSettings,
+      ...parsed,
+      theme: normalizeTheme(parsed.theme),
+      session: {
+        noteId: typeof parsed.session?.noteId === 'string' ? parsed.session.noteId : null,
+        files: Array.isArray(parsed.session?.files)
+          ? parsed.session.files.filter((item): item is string => typeof item === 'string')
+          : [],
+        activeFile: typeof parsed.session?.activeFile === 'string' ? parsed.session.activeFile : null
+      }
+    }
   } catch {
     settingsCache = { ...defaultSettings }
   }
@@ -368,7 +380,9 @@ function buildMenu(): Menu {
         { role: 'paste' },
         { role: 'selectAll' },
         { type: 'separator' },
-        { label: 'Find', accelerator: 'CmdOrCtrl+F', click: () => sendMenu('find') }
+        { label: 'Find', accelerator: 'CmdOrCtrl+F', click: () => sendMenu('find') },
+        { label: 'Replace', accelerator: 'CmdOrCtrl+H', click: () => sendMenu('replace') },
+        { label: 'Go to line', accelerator: 'CmdOrCtrl+G', click: () => sendMenu('goto-line') }
       ]
     },
     {
@@ -385,6 +399,7 @@ function buildMenu(): Menu {
         },
         { label: 'Next theme', accelerator: 'CmdOrCtrl+Shift+T', click: () => sendMenu('toggle-theme') },
         { label: 'Word wrap', accelerator: 'Alt+Z', click: () => sendMenu('toggle-wrap') },
+        { label: 'Markdown preview', click: () => sendMenu('toggle-preview') },
         { type: 'separator' },
         { label: 'Larger text', accelerator: 'CmdOrCtrl+=', click: () => sendMenu('font-larger') },
         { label: 'Smaller text', accelerator: 'CmdOrCtrl+-', click: () => sendMenu('font-smaller') },
@@ -427,7 +442,9 @@ function attachEditorContextMenu(win: BrowserWindow): void {
         { role: 'paste', enabled: params.editFlags.canPaste },
         { role: 'selectAll', enabled: params.editFlags.canSelectAll },
         { type: 'separator' },
-        { label: 'Find', accelerator: 'CmdOrCtrl+F', click: () => sendMenu('find') }
+        { label: 'Find', accelerator: 'CmdOrCtrl+F', click: () => sendMenu('find') },
+        { label: 'Replace', accelerator: 'CmdOrCtrl+H', click: () => sendMenu('replace') },
+        { label: 'Go to line', accelerator: 'CmdOrCtrl+G', click: () => sendMenu('goto-line') }
       )
     } else {
       items.push({ role: 'copy' })

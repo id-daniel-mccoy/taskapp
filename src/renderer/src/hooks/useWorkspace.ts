@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   AppSettings,
+  EditorSession,
   MenuCommand,
   NoteDocument,
   OpenFileResult
@@ -55,6 +56,7 @@ export interface TextFileViewerDoc {
   path: string
   name: string
   mime: string
+  language: string
   label: string
   content: string
   dirty: boolean
@@ -63,7 +65,7 @@ export interface TextFileViewerDoc {
 export type ViewerDoc = JsonViewerDoc | PdfViewerDoc | ImageViewerDoc | AudioViewerDoc | TextFileViewerDoc
 export type EditableViewerDoc = JsonViewerDoc | TextFileViewerDoc
 
-function isEditableViewer(doc: ViewerDoc | null): doc is EditableViewerDoc {
+function isEditableViewer(doc: ViewerDoc | null | undefined): doc is EditableViewerDoc {
   return Boolean(doc && (doc.kind === 'json' || doc.kind === 'text-file'))
 }
 
@@ -80,6 +82,7 @@ function viewerAfterSave(id: string, filePath: string, content: string): Editabl
     name,
     mime: type.mime.startsWith('image/') || type.kind === 'pdf' || type.kind === 'audio' ? 'text/plain' : type.mime,
     label: type.kind === 'pdf' || type.kind === 'image' || type.kind === 'audio' || type.kind === 'unsupported' ? 'Text' : type.label,
+    language: type.language,
     content,
     dirty: false
   }
@@ -91,11 +94,14 @@ interface Toast {
   tone: 'info' | 'error'
 }
 
+const emptySession: EditorSession = { noteId: null, files: [], activeFile: null }
+
 const emptySettings: AppSettings = {
   theme: 'dark',
   wordWrap: true,
   fontSize: 16,
-  recents: []
+  recents: [],
+  session: emptySession
 }
 
 function uid(): string {
@@ -133,6 +139,7 @@ export function useWorkspace() {
   const [ready, setReady] = useState(false)
   const saveTimers = useRef(new Map<string, number>())
   const draftIds = useRef(new Set<string>())
+  const lastNoteId = useRef<string | null>(null)
 
   const activeNote = notes.find((note) => note.id === activeNoteId) ?? null
   const activeViewer = viewers.find((doc) => doc.id === activeViewerId) ?? null
@@ -162,10 +169,11 @@ export function useWorkspace() {
       toast(result.error || 'Could not save the note.', 'error')
       return false
     }
+    const record = result.record
     setNotes((current) =>
       current.map((note) =>
         note.id === id
-          ? { ...note, content, dirty: false, updatedAt: result.record.updatedAt }
+          ? { ...note, content, dirty: false, updatedAt: record.updatedAt }
           : note
       )
     )
@@ -448,6 +456,7 @@ export function useWorkspace() {
           path: result.path,
           name: result.name,
           mime: result.mime,
+          language: result.language,
           label: result.label,
           content: result.content,
           dirty: false
@@ -582,6 +591,9 @@ export function useWorkspace() {
     if (command === 'paste') runNoteEdit('paste')
     if (command === 'select-all') runNoteEdit('selectAll')
     if (command === 'find') window.dispatchEvent(new CustomEvent('taskapp:find'))
+    if (command === 'replace') window.dispatchEvent(new CustomEvent('taskapp:replace'))
+    if (command === 'goto-line') window.dispatchEvent(new CustomEvent('taskapp:goto-open'))
+    if (command === 'toggle-preview') window.dispatchEvent(new CustomEvent('taskapp:preview'))
     if (command === 'command-palette') setPaletteOpen(true)
     if (command === 'settings') setSettingsOpen(true)
     if (command === 'shortcuts') setShortcutsOpen(true)
@@ -606,12 +618,19 @@ export function useWorkspace() {
     }
   }, [activeNote, activeViewer, changeFont, closeViewer, duplicateNote, newNote, openFiles, persistSettings, requestDelete, saveActive, saveActiveAs, settings, showNoteFile, theme])
 
+  const sessionReady = useRef(false)
+
   useEffect(() => {
     let cancelled = false
     void Promise.all([window.taskapp.getSettings(), window.taskapp.listNotes()])
-      .then(([loadedSettings, library]) => {
+      .then(async ([loadedSettings, library]) => {
         if (cancelled) return
-        setSettings({ ...loadedSettings, theme: normalizeTheme(loadedSettings.theme) })
+        const session = loadedSettings.session ?? emptySession
+        setSettings({
+          ...loadedSettings,
+          theme: normalizeTheme(loadedSettings.theme),
+          session
+        })
         setNotesDir(library.dir)
         const loaded = library.notes.map((record) => ({
           ...record,
@@ -619,18 +638,67 @@ export function useWorkspace() {
           dirty: false
         }))
         setNotes(loaded)
-        setActiveNoteId(loaded[0]?.id ?? null)
+        const noteId = session.noteId && loaded.some((note) => note.id === session.noteId)
+          ? session.noteId
+          : loaded[0]?.id ?? null
+        lastNoteId.current = noteId
+        setActiveNoteId(session.activeFile ? null : noteId)
+        if (session.files.length) {
+          for (const filePath of session.files) {
+            if (cancelled) return
+            await applyOpenResult(await window.taskapp.openPath(filePath))
+          }
+          if (cancelled) return
+          if (session.activeFile) {
+            setViewers((current) => {
+              const match = current.find((doc) => doc.path === session.activeFile)
+              if (match) {
+                setActiveViewerId(match.id)
+                setActiveNoteId(null)
+              }
+              return current
+            })
+          } else if (noteId) {
+            setActiveViewerId(null)
+            setActiveNoteId(noteId)
+          }
+        }
       })
       .catch((error: unknown) => {
         if (!cancelled) toast(error instanceof Error ? error.message : 'Could not load notes.', 'error')
       })
       .finally(() => {
-        if (!cancelled) setReady(true)
+        if (!cancelled) {
+          sessionReady.current = true
+          setReady(true)
+        }
       })
     return () => {
       cancelled = true
     }
-  }, [toast])
+  }, [applyOpenResult, toast])
+
+  useEffect(() => {
+    if (activeNoteId) lastNoteId.current = activeNoteId
+  }, [activeNoteId])
+
+  useEffect(() => {
+    if (!sessionReady.current) return
+    const timer = window.setTimeout(() => {
+      if (activeNoteId) lastNoteId.current = activeNoteId
+      const session: EditorSession = {
+        noteId: lastNoteId.current,
+        files: viewers.map((doc) => doc.path),
+        activeFile: activeViewer?.path ?? null
+      }
+      setSettings((current) => {
+        const next = { ...current, session }
+        void window.taskapp.setSettings(next)
+        return next
+      })
+    }, 500)
+    return () => window.clearTimeout(timer)
+  }, [activeNoteId, activeViewer, viewers])
 
   useEffect(() => {
     const offMenu = window.taskapp.onMenuCommand(handleMenu)

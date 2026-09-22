@@ -33,6 +33,7 @@ This is the first surface of a larger product. Tasks and reminders come next. Th
 - **Readers for the rest.** PDFs scroll as a full document. Images sit on a checkerboard so transparency is honest.
 - **Yours, on disk.** The notes library lives in the app data folder on this machine. Nothing is uploaded.
 - **At home on Linux.** Install once, then launch from the terminal, the application menu, or **Open with**.
+- **Pick up where you left off.** The last note and open file tabs come back on launch. File tabs get syntax highlighting; Markdown can toggle a preview.
 
 Ink-and-paper color was the default look. Themes now include Light, Dark, Ocean Dream, Dark Forest, and Purple Rain, plus a command palette and a compact notepad toolbar.
 
@@ -126,7 +127,7 @@ The window is the app. A local Vite server on port 4718 is only what Electron lo
 | Kind | What happens |
 | --- | --- |
 | **Notes** (`.txt`, `.text`) | Opening from disk imports a copy into the notes library. New notes are drafts until you name them. |
-| **Other text** | Markdown, HTML, CSS, JS/TS, XML, CSV, YAML, TOML, shell, and common source files open as editable file tabs. Save / Save as write to disk. |
+| **Other text** | Markdown, HTML, CSS, JS/TS, XML, CSV, YAML, TOML, shell, and common source files open as editable file tabs with syntax highlighting. Markdown can toggle a preview. Save / Save as write to disk. |
 | **JSON** | Same as other text files, with a live valid/invalid banner. Formatted once on open. |
 | **PDF** | Read-only, full-document scroll, page controls, and zoom. |
 | **Images** | Read-only viewer with a transparency checkerboard, fit, and zoom. PNG, JPEG, GIF, WebP, BMP, ICO, SVG, AVIF. TIFF is attempted (Chromium often cannot decode it). |
@@ -149,6 +150,9 @@ Notes are stored under the Electron user-data directory. On Linux that is typica
 | `F2` | Rename note |
 | `Ctrl+W` | Close the current file tab |
 | `Ctrl+F` | Find |
+| `Ctrl+H` | Replace |
+| `Ctrl+G` | Go to line |
+| `Tab` / `Shift+Tab` | Indent or outdent the current lines in a note |
 | `Ctrl+Shift+T` | Next theme |
 | `Alt+Z` | Word wrap |
 | `Ctrl+,` | Settings |

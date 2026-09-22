@@ -57,7 +57,9 @@ function menus(theme: ThemePreference): MenuGroup[] {
         { kind: 'command', id: 'paste', label: 'Paste', shortcut: 'Ctrl+V' },
         { kind: 'command', id: 'select-all', label: 'Select all', shortcut: 'Ctrl+A' },
         { kind: 'separator' },
-        { kind: 'command', id: 'find', label: 'Find', shortcut: 'Ctrl+F' }
+        { kind: 'command', id: 'find', label: 'Find', shortcut: 'Ctrl+F' },
+        { kind: 'command', id: 'replace', label: 'Replace', shortcut: 'Ctrl+H' },
+        { kind: 'command', id: 'goto-line', label: 'Go to line', shortcut: 'Ctrl+G' }
       ]
     },
     {
@@ -79,6 +81,7 @@ function menus(theme: ThemePreference): MenuGroup[] {
         },
         { kind: 'command', id: 'toggle-theme', label: 'Next theme', shortcut: 'Ctrl+Shift+T' },
         { kind: 'command', id: 'toggle-wrap', label: 'Word wrap', shortcut: 'Alt+Z' },
+        { kind: 'command', id: 'toggle-preview', label: 'Markdown preview' },
         { kind: 'separator' },
         { kind: 'command', id: 'font-larger', label: 'Larger text', shortcut: 'Ctrl+=' },
         { kind: 'command', id: 'font-smaller', label: 'Smaller text', shortcut: 'Ctrl+-' },

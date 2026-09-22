@@ -16,11 +16,18 @@ export interface RecentFile {
   openedAt: number
 }
 
+export interface EditorSession {
+  noteId: string | null
+  files: string[]
+  activeFile: string | null
+}
+
 export interface AppSettings {
   theme: ThemePreference
   wordWrap: boolean
   fontSize: number
   recents: RecentFile[]
+  session: EditorSession
 }
 
 export interface Alarm {
@@ -155,6 +162,9 @@ export type MenuCommand =
   | 'paste'
   | 'select-all'
   | 'find'
+  | 'replace'
+  | 'goto-line'
+  | 'toggle-preview'
   | 'command-palette'
   | 'toggle-theme'
   | 'theme-light'

@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import type { NoteDocument } from '@shared/types'
-import { runNoteEdit } from '../lib/edit'
+import { findMatches, offsetFromLineColumn, replaceAll } from '@shared/text'
+import { FindBar } from './FindBar'
 import { IconButton } from './IconButton'
+import { caretFromTextarea, emitCaret, indentTextarea, setTextareaValue } from '../lib/caret'
+import { runNoteEdit } from '../lib/edit'
 import {
   IconCopy,
   IconCut,
@@ -12,8 +15,7 @@ import {
   IconSearch,
   IconSelectAll,
   IconUndo,
-  IconWrap,
-  IconX
+  IconWrap
 } from '../lib/icons'
 
 interface Props {
@@ -28,7 +30,31 @@ export function NoteEditor({ note, wordWrap, fontSize, onChange, onCommand }: Pr
   const field = useRef<HTMLTextAreaElement>(null)
   const findField = useRef<HTMLInputElement>(null)
   const [findOpen, setFindOpen] = useState(false)
+  const [showReplace, setShowReplace] = useState(false)
   const [query, setQuery] = useState('')
+  const [replace, setReplace] = useState('')
+  const [caseSensitive, setCaseSensitive] = useState(false)
+  const [wholeWord, setWholeWord] = useState(false)
+  const [hit, setHit] = useState(0)
+  const seenMatch = useRef(false)
+
+  const hits = findMatches(note.content, query, caseSensitive, wholeWord)
+  const matchLabel = !query ? '' : hits.length ? `${Math.min(hit + 1, hits.length)} of ${hits.length}` : 'No matches'
+
+  const report = () => {
+    if (field.current) emitCaret(caretFromTextarea(field.current))
+  }
+
+  const openFind = (withReplace: boolean) => {
+    const node = field.current
+    if (node) {
+      const selected = node.value.slice(node.selectionStart, node.selectionEnd)
+      if (selected && !selected.includes('\n') && selected.length < 120) setQuery(selected)
+    }
+    setShowReplace(withReplace)
+    setFindOpen(true)
+    window.setTimeout(() => findField.current?.select(), 0)
+  }
 
   useEffect(() => {
     const node = field.current
@@ -36,33 +62,67 @@ export function NoteEditor({ note, wordWrap, fontSize, onChange, onCommand }: Pr
     const active = document.activeElement
     if (active instanceof HTMLInputElement) return
     node.focus()
+    report()
   }, [note.id])
 
   useEffect(() => {
-    const onFind = () => {
-      setFindOpen(true)
-      window.setTimeout(() => findField.current?.select(), 0)
-    }
+    const onFind = () => openFind(false)
+    const onReplace = () => openFind(true)
     const onFocus = () => field.current?.focus()
+    const onGoto = (event: Event) => {
+      const detail = (event as CustomEvent<{ line: number; column: number }>).detail
+      const node = field.current
+      if (!detail || !node) return
+      const offset = offsetFromLineColumn(node.value, detail.line, detail.column)
+      node.focus()
+      node.setSelectionRange(offset, offset)
+      report()
+    }
     window.addEventListener('taskapp:find', onFind)
+    window.addEventListener('taskapp:replace', onReplace)
     window.addEventListener('taskapp:focus-editor', onFocus)
+    window.addEventListener('taskapp:goto', onGoto)
     return () => {
       window.removeEventListener('taskapp:find', onFind)
+      window.removeEventListener('taskapp:replace', onReplace)
       window.removeEventListener('taskapp:focus-editor', onFocus)
+      window.removeEventListener('taskapp:goto', onGoto)
     }
   }, [])
 
-  const findNext = () => {
+  useEffect(() => {
+    setHit(0)
+    seenMatch.current = false
+  }, [query, caseSensitive, wholeWord, note.content])
+
+  useEffect(() => () => emitCaret(null), [])
+
+  const reveal = (index: number) => {
     const node = field.current
-    const needle = query
-    if (!node || !needle) return
-    const start = node.selectionEnd === node.selectionStart ? node.selectionEnd : node.selectionEnd
-    const haystack = node.value
-    let index = haystack.indexOf(needle, start)
-    if (index < 0) index = haystack.indexOf(needle, 0)
-    if (index < 0) return
+    if (!node || !query || !hits.length) return
+    const next = (index + hits.length) % hits.length
+    setHit(next)
+    seenMatch.current = true
     node.focus()
-    node.setSelectionRange(index, index + needle.length)
+    node.setSelectionRange(hits[next], hits[next] + query.length)
+    report()
+  }
+
+  const replaceOne = () => {
+    const node = field.current
+    if (!node || !query || !hits.length) return
+    const current = hits[Math.min(hit, hits.length - 1)]
+    const next = node.value.slice(0, current) + replace + node.value.slice(current + query.length)
+    const caret = current + replace.length
+    setTextareaValue(node, next, caret)
+  }
+
+  const replaceEvery = () => {
+    const node = field.current
+    if (!node || !query) return
+    const result = replaceAll(node.value, query, replace, caseSensitive, wholeWord)
+    if (!result.count) return
+    setTextareaValue(node, result.next, node.selectionStart)
   }
 
   return (
@@ -82,36 +142,43 @@ export function NoteEditor({ note, wordWrap, fontSize, onChange, onCommand }: Pr
         <IconButton label="Larger text" onClick={() => onCommand('font-larger')}><IconFontLarger /></IconButton>
       </div>
       {findOpen && (
-        <form
-          className="find-bar"
-          onSubmit={(event) => {
-            event.preventDefault()
-            findNext()
+        <FindBar
+          query={query}
+          replace={replace}
+          caseSensitive={caseSensitive}
+          wholeWord={wholeWord}
+          showReplace={showReplace}
+          matchLabel={matchLabel}
+          findRef={findField}
+          onQuery={setQuery}
+          onReplaceValue={setReplace}
+          onToggleCase={() => setCaseSensitive((value) => !value)}
+          onToggleWord={() => setWholeWord((value) => !value)}
+          onNext={() => reveal(seenMatch.current ? hit + 1 : hit)}
+          onPrev={() => reveal(hit - 1)}
+          onReplace={replaceOne}
+          onReplaceAll={replaceEvery}
+          onClose={() => {
+            setFindOpen(false)
+            field.current?.focus()
           }}
-        >
-          <input
-            ref={findField}
-            value={query}
-            placeholder="Find in note"
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                setFindOpen(false)
-                field.current?.focus()
-              }
-            }}
-          />
-          <button type="submit" className="chip-btn">Find next</button>
-          <IconButton label="Close find" onClick={() => { setFindOpen(false); field.current?.focus() }}>
-            <IconX />
-          </IconButton>
-        </form>
+        />
       )}
       <textarea
         ref={field}
         className="note-editor"
         value={note.content}
         onChange={(event) => onChange(event.target.value)}
+        onSelect={report}
+        onKeyUp={report}
+        onClick={report}
+        onKeyDown={(event) => {
+          if (event.key === 'Tab') {
+            event.preventDefault()
+            indentTextarea(event.currentTarget, event.shiftKey)
+            report()
+          }
+        }}
         placeholder="Start writing…"
         spellCheck
         autoCorrect="on"

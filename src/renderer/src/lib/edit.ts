@@ -1,11 +1,30 @@
-export function noteEditor(): HTMLTextAreaElement | null {
-  const active = document.activeElement
-  if (active instanceof HTMLTextAreaElement) return active
-  return document.querySelector('textarea.note-editor, textarea.file-viewer-body')
+import type { editor } from 'monaco-editor'
+import { noteEditor } from './fields'
+
+let monacoEditor: editor.IStandaloneCodeEditor | null = null
+
+export function bindMonaco(instance: editor.IStandaloneCodeEditor | null): void {
+  monacoEditor = instance
 }
+
+export { noteEditor }
 
 export function runNoteEdit(action: 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'selectAll'): void {
   const field = noteEditor()
+  const textareaFocused = field instanceof HTMLTextAreaElement && document.activeElement === field
+  if (!textareaFocused && monacoEditor) {
+    const commands: Record<typeof action, string> = {
+      undo: 'undo',
+      redo: 'redo',
+      cut: 'editor.action.clipboardCutAction',
+      copy: 'editor.action.clipboardCopyAction',
+      paste: 'editor.action.clipboardPasteAction',
+      selectAll: 'editor.action.selectAll'
+    }
+    monacoEditor.focus()
+    monacoEditor.trigger('taskapp', commands[action], null)
+    return
+  }
   if (!field) return
   field.focus()
   if (action === 'paste') {

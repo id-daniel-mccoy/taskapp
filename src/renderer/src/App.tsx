@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
+import type { CaretInfo } from '@shared/text'
 import { ActivityRail } from './components/ActivityRail'
 import { AlarmEditor } from './components/AlarmEditor'
 import { AlarmOverlay } from './components/AlarmOverlay'
 import { AlarmsList } from './components/AlarmsList'
 import { AudioViewer } from './components/AudioViewer'
 import { CommandPalette, ConfirmDialog, SettingsPanel, ShortcutsPanel } from './components/Overlays'
+import { GoToLine } from './components/GoToLine'
 import { JsonViewer } from './components/JsonViewer'
 import { ImageViewer } from './components/ImageViewer'
 import { NoteEditor } from './components/NoteEditor'
@@ -23,6 +25,8 @@ export function App() {
   const alarms = useAlarms()
   const [section, setSection] = useState<'notes' | 'alarms'>('notes')
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [caret, setCaret] = useState<CaretInfo | null>(null)
+  const [gotoOpen, setGotoOpen] = useState(false)
   const {
     activeNote,
     activeViewer,
@@ -67,6 +71,14 @@ export function App() {
         event.preventDefault()
         handleMenu('find')
       }
+      if (meta && event.key.toLowerCase() === 'h') {
+        event.preventDefault()
+        handleMenu('replace')
+      }
+      if (meta && event.key.toLowerCase() === 'g') {
+        event.preventDefault()
+        setGotoOpen(true)
+      }
       if (meta && event.key.toLowerCase() === 'w') {
         event.preventDefault()
         if (activeViewer) closeViewer(activeViewer.id)
@@ -100,11 +112,25 @@ export function App() {
         setSettingsOpen(false)
         setShortcutsOpen(false)
         setRenamingId(null)
+        setGotoOpen(false)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [activeNote, activeViewer, closeViewer, handleMenu, newNote, openFiles, saveActive, saveActiveAs, setPaletteOpen, setRenamingId, setSettingsOpen, setShortcutsOpen])
+
+  useEffect(() => {
+    const onCaret = (event: Event) => {
+      setCaret((event as CustomEvent<CaretInfo | null>).detail)
+    }
+    const onGotoOpen = () => setGotoOpen(true)
+    window.addEventListener('taskapp:caret', onCaret)
+    window.addEventListener('taskapp:goto-open', onGotoOpen)
+    return () => {
+      window.removeEventListener('taskapp:caret', onCaret)
+      window.removeEventListener('taskapp:goto-open', onGotoOpen)
+    }
+  }, [])
 
   useEffect(() => {
     if (activeViewer) setSection('notes')
@@ -160,7 +186,7 @@ export function App() {
         theme={workspace.theme}
         titleFocusKey={workspace.titleFocusKey}
         onMenu={(command) => {
-          if (command === 'new' || command === 'open' || command === 'rename' || command === 'duplicate' || command === 'delete-note' || command === 'find') {
+          if (command === 'new' || command === 'open' || command === 'rename' || command === 'duplicate' || command === 'delete-note' || command === 'find' || command === 'replace' || command === 'goto-line') {
             setSection('notes')
           }
           if (command === 'new') setSidebarOpen(true)
@@ -256,6 +282,7 @@ export function App() {
                 dirty={activeViewer.dirty}
                 wordWrap={workspace.settings.wordWrap}
                 fontSize={workspace.settings.fontSize}
+                theme={workspace.theme}
                 onChange={workspace.updateViewerContent}
               />
             )}
@@ -264,10 +291,12 @@ export function App() {
                 name={activeViewer.name}
                 path={activeViewer.path}
                 label={activeViewer.label}
+                language={activeViewer.language}
                 content={activeViewer.content}
                 dirty={activeViewer.dirty}
                 wordWrap={workspace.settings.wordWrap}
                 fontSize={workspace.settings.fontSize}
+                theme={workspace.theme}
                 onChange={workspace.updateViewerContent}
               />
             )}
@@ -287,8 +316,17 @@ export function App() {
         viewer={section === 'notes' ? activeViewer : null}
         wordWrap={workspace.settings.wordWrap}
         saving={Boolean(activeNote?.dirty || (activeViewer && 'dirty' in activeViewer && activeViewer.dirty))}
+        caret={section === 'notes' ? caret : null}
         statusHint={alarmHint}
         modeLabel={section === 'alarms' ? 'Alarms' : undefined}
+        onGoto={() => setGotoOpen(true)}
+      />
+      <GoToLine
+        open={gotoOpen}
+        onClose={() => setGotoOpen(false)}
+        onGo={(line, column) => {
+          window.dispatchEvent(new CustomEvent('taskapp:goto', { detail: { line, column } }))
+        }}
       />
       {workspace.paletteOpen && (
         <CommandPalette onClose={() => workspace.setPaletteOpen(false)} onRun={workspace.handleMenu} />

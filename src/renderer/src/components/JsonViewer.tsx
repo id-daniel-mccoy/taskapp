@@ -1,4 +1,6 @@
 import { inspectJson } from '../lib/json'
+import type { ThemePreference } from '@shared/types'
+import { CodeEditor } from './CodeEditor'
 
 interface Props {
   name: string
@@ -7,10 +9,11 @@ interface Props {
   dirty: boolean
   wordWrap: boolean
   fontSize: number
+  theme: ThemePreference
   onChange: (value: string) => void
 }
 
-export function JsonViewer({ name, path, content, dirty, wordWrap, fontSize, onChange }: Props) {
+export function JsonViewer({ name, path, content, dirty, wordWrap, fontSize, theme, onChange }: Props) {
   const check = inspectJson(content)
   return (
     <div className="file-viewer">
@@ -23,13 +26,14 @@ export function JsonViewer({ name, path, content, dirty, wordWrap, fontSize, onC
           {check.ok ? `JSON${dirty ? ' · unsaved' : ''}` : check.message}
         </em>
       </div>
-      <textarea
-        className="file-viewer-body"
+      <CodeEditor
+        key={path}
         value={content}
-        onChange={(event) => onChange(event.target.value)}
-        spellCheck={false}
-        wrap={wordWrap ? 'soft' : 'off'}
-        style={{ fontSize: `${fontSize}px`, whiteSpace: wordWrap ? 'pre-wrap' : 'pre' }}
+        language="json"
+        theme={theme}
+        wordWrap={wordWrap}
+        fontSize={fontSize}
+        onChange={onChange}
       />
     </div>
   )

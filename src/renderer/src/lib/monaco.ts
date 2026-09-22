@@ -104,4 +104,41 @@ export function registerThemes(): void {
   })
 }
 
+let registered = false
+
+export function ensureMonacoThemes(): void {
+  if (registered) return
+  registerThemes()
+  registered = true
+}
+
+const KNOWN = new Set([
+  'plaintext',
+  'markdown',
+  'json',
+  'html',
+  'css',
+  'scss',
+  'less',
+  'javascript',
+  'typescript',
+  'xml',
+  'yaml',
+  'python',
+  'shell',
+  'sql',
+  'rust',
+  'go',
+  'java',
+  'c',
+  'cpp',
+  'ruby',
+  'php',
+  'ini'
+])
+
+export function monacoLanguage(language: string): string {
+  return KNOWN.has(language) ? language : 'plaintext'
+}
+
 export { monaco }

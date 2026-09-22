@@ -1,3 +1,4 @@
+import type { CaretInfo } from '@shared/text'
 import type { NoteDocument } from '@shared/types'
 import type { ViewerDoc } from '../hooks/useWorkspace'
 
@@ -6,8 +7,10 @@ interface Props {
   viewer: ViewerDoc | null
   wordWrap: boolean
   saving: boolean
+  caret: CaretInfo | null
   statusHint?: string | null
   modeLabel?: string
+  onGoto?: () => void
 }
 
 function viewerLabel(kind: ViewerDoc['kind']): string {
@@ -17,18 +20,34 @@ function viewerLabel(kind: ViewerDoc['kind']): string {
   return kind.toUpperCase()
 }
 
-export function StatusBar({ note, viewer, wordWrap, saving, statusHint, modeLabel }: Props) {
-  const words = note ? note.content.trim().split(/\s+/).filter(Boolean).length : 0
+function countWords(value: string): number {
+  return value.trim().split(/\s+/).filter(Boolean).length
+}
+
+export function StatusBar({ note, viewer, wordWrap, saving, caret, statusHint, modeLabel, onGoto }: Props) {
+  const words = note ? countWords(note.content) : viewer && 'content' in viewer ? countWords(viewer.content) : 0
+  const showWords = Boolean(note || (viewer && 'content' in viewer))
   return (
     <footer className="status">
       <div className="status-left">
         <span>UTF-8</span>
         {note && <span>Plain text note</span>}
         {viewer && <span>{viewer.mime}</span>}
-        {note && <span>{words} {words === 1 ? 'word' : 'words'}</span>}
+        {showWords && <span>{words} {words === 1 ? 'word' : 'words'}</span>}
+        {caret && caret.selected > 0 && (
+          <span>
+            {caret.selected} selected
+            {caret.selectedWords ? ` · ${caret.selectedWords} ${caret.selectedWords === 1 ? 'word' : 'words'}` : ''}
+          </span>
+        )}
         {statusHint && <span>{statusHint}</span>}
       </div>
       <div className="status-right">
+        {caret && (note || (viewer && 'content' in viewer)) && (
+          <button type="button" className="status-goto" onClick={onGoto} title="Go to line">
+            Ln {caret.line}, Col {caret.column}
+          </button>
+        )}
         {note && <span>{note.draft ? 'Name the note to save it' : saving ? 'Saving…' : 'Saved locally'}</span>}
         {viewer && (
           <span>

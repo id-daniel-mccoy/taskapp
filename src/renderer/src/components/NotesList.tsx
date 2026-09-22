@@ -26,6 +26,11 @@ function createdLabel(createdAt: number): string {
   })
 }
 
+function matchesQuery(note: NoteDocument, needle: string): boolean {
+  if (!needle) return true
+  return `${note.title}\n${note.content}`.toLowerCase().includes(needle)
+}
+
 interface MenuState {
   x: number
   y: number
@@ -47,7 +52,9 @@ export function NotesList({
   collapsed = false
 }: Props) {
   const [menu, setMenu] = useState<MenuState | null>(null)
+  const [query, setQuery] = useState('')
   const renameField = useRef<HTMLInputElement>(null)
+  const visible = notes.filter((note) => matchesQuery(note, query.trim().toLowerCase()))
 
   useEffect(() => {
     if (!renamingId) return
@@ -96,11 +103,22 @@ export function NotesList({
           <IconPlus />
         </IconButton>
       </div>
+      {notes.length > 0 && (
+        <input
+          className="notes-filter"
+          value={query}
+          placeholder="Search notes"
+          aria-label="Search notes"
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      )}
       {notes.length === 0 ? (
         <p className="empty-note">No notes yet. Create one and it will be saved as a .txt file on this computer.</p>
+      ) : visible.length === 0 ? (
+        <p className="empty-note">No notes match that search.</p>
       ) : (
         <div className="notes-list-body">
-          {notes.map((note) => (
+          {visible.map((note) => (
             <div
               key={note.id}
               className={`note-item${note.id === activeId ? ' active' : ''}`}
